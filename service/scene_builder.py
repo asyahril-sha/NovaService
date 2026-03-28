@@ -19,6 +19,164 @@ class SceneBuilder:
     def __init__(self, character):
         self.character = character
         self.last_scene_type = None
+        
+        # Tambahkan di class SceneBuilder
+
+    def build_greeting(self) -> str:
+        """Build greeting scene"""
+        return self.build_greeting_scene()
+
+    def build_back_massage_start(self) -> str:
+        """Scene awal pijat belakang"""
+        return self.build_reflex_back_start_scene()
+
+    def build_back_massage_response(self, response_type: str) -> str:
+        """Respons selama pijat belakang"""
+        if response_type == "enak":
+            return self.build_reflex_back_pijat_punggung()
+        elif response_type == "tekan":
+            return "*Tekanannya ditambah* \"Gini Mas?\""
+        else:
+            return self.build_reflex_back_pijat_pundak()
+
+    def build_front_massage_start(self) -> str:
+        """Scene awal pijat depan"""
+        return self.build_reflex_front_start_scene()
+
+    def build_front_massage_response(self, response_type: str) -> str:
+        """Respons selama pijat depan"""
+        if response_type == "enak":
+            return self.build_reflex_front_pijat_dada()
+        else:
+            return self.build_reflex_front_pijat_perut()
+
+    def build_front_massage_ongoing(self) -> str:
+        """Scene ongoing pijat depan"""
+        return self.build_reflex_front_pijat_perut()
+
+    def build_extra_offer(self) -> str:
+        """Tawaran extra service"""
+        return f"""*{self.character.name} berhenti memijat, duduk di samping Mas*
+
+    "Mas... pijat refleksinya udah selesai. Ada yang mau dilanjut?"
+
+    *{self.character.name} tersenyum sedikit genit*
+
+    "Pijat vitalitas... biar Mas bisa lebih rileks... 2 jam... special service..."
+
+    *menyentuh tangan Mas pelan*
+
+    "Ada BJ 500rb, atau sex 1jt... bisa nego kok Mas... Gimana?"""
+
+    def build_nego_bj(self, price: int) -> str:
+        """Negosiasi BJ"""
+        return f"""*{self.character.name} menjilat bibir*
+
+    "BJ ya Mas? 2 jam... Rp{price:,} aja..."
+
+    *mendekat, napas mulai berat*
+
+    "Deal?"""
+
+    def build_nego_sex(self, price: int) -> str:
+        """Negosiasi sex"""
+        return f"""*{self.character.name} mendekat, dada mulai terlihat*
+
+    "Sex ya Mas? 2 jam... Rp{price:,}..."
+
+    *mata sayu*
+
+    "Bisa puasin Mas... deal?"""
+
+    def build_nego_counter(self, price: int, service: str) -> str:
+        """Counter negosiasi"""
+        return f"""*{self.character.name} tersenyum*
+
+    "Rp{price:,} ya Mas... udah harga special buat Mas..."
+
+    *menjilat bibir*
+
+    "Gimana? Deal?"""
+
+    def build_nego_failed(self) -> str:
+        """Negosiasi gagal"""
+        return "*{self.character.name} menghela napas*\n\n\"Gak jadi ya Mas... lain kali aja.\""
+
+    def build_deal_failed(self) -> str:
+        """Deal gagal"""
+        return "*{self.character.name} menggeleng*\n\n\"Maaf Mas, harga segitu gak bisa. Lain kali ya.\""
+
+    def build_hj_start(self) -> str:
+        """Mulai HJ"""
+        return self.build_hj_start_scene()
+
+    def build_hj_response(self, response_type: str) -> str:
+        """Respons selama HJ"""
+        if response_type == "cepat":
+            return self.build_hj_fast_scene()
+        elif response_type == "pelan":
+            return self.build_hj_slow_scene()
+        else:
+            return self.build_hj_medium_scene()
+
+    def build_hj_ongoing(self) -> str:
+        """HJ ongoing"""
+        return self.build_hj_medium_scene()
+
+    def build_bj_start(self) -> str:
+        """Mulai BJ"""
+        return f"""*{self.character.name} turun berlutut, wajahnya tepat di depan kontol Mas yang sudah keras*
+
+    "{self.character.panggilan}... *mata sayu* aku mulai ya..."
+
+    *Mulutnya terbuka, perlahan memasukkan kontol Mas*
+
+    "Hhngg... *mulut penuh* kontol {self.character.panggilan}... gede..." """
+
+    def build_sex_start(self) -> str:
+        """Mulai sex"""
+        return f"""*{self.character.name} naik ke atas tubuh Mas, kontol Mas terarah ke pintu masuk*
+
+    "{self.character.panggilan}... *napas mulai berat* aku masuk ya..."
+
+    *Pinggulnya turun perlahan, kontol Mas masuk dalam*
+
+    "Ahh... dalem... dalem banget, {self.character.panggilan}..." """
+
+    def build_extra_response(self, service: str, response_type: str) -> str:
+        """Respons selama extra service"""
+        if response_type == "cepat":
+            return f"*{self.character.name} mempercepat gerakan*\n\n\"Gini {self.character.panggilan}?\""
+        elif response_type == "pelan":
+            return f"*{self.character.name} memperlambat gerakan*\n\n\"Pelan-pelan ya {self.character.panggilan}...\""
+        else:
+            return f"*{self.character.name} tersenyum, terus melayani*\n\n\"Enak ya {self.character.panggilan}...\""
+
+    def build_extra_ongoing(self, service: str) -> str:
+        """Extra service ongoing"""
+        if service == "bj":
+            return f"*{self.character.name} terus menghisap, kepalanya bergerak naik turun*\n\n\"Hhngg... {self.character.panggilan}... enak?\""
+        else:
+            return f"*{self.character.name} bergerak, pinggulnya naik turun*\n\n\"{self.character.panggilan}... dalam...\""
+
+    def build_climax_response(self, intensity: str) -> str:
+        """Respons climax"""
+        if intensity == "heavy":
+            return self.build_climax_scene("heavy")
+        else:
+            return self.build_climax_scene("normal")
+
+    def build_position_change(self, position: str) -> str:
+        """Scene setelah ganti posisi"""
+        return self.build_position_request_scene(position)
+
+    def build_break_scene(self, character) -> str:
+        """Scene break"""
+        return f"""*{character.name} duduk di samping, napas masih sedikit tersengal*
+
+    "{character.panggilan}... mau istirahat dulu? Aku temenin."
+
+    *Dia tersenyum, tangannya masih memegang tangan {character.panggilan}* """
     
     # =========================================================================
     # GREETING SCENES
