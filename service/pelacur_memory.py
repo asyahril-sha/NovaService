@@ -459,6 +459,7 @@ RIWAYAT CLIMAX:
             'panas': "tubuh terasa panas, menggairahkan"
         }
 
+    # Peringatan status pakaian Mas
     clothing_warning = """
 ┌───────────────────────────────────────────────────────────────────────────────┐
 │ 👕⚠️ STATUS PAKAIAN MAS (WAJIB DIPATUHI!) ⚠️👕                              │
@@ -472,57 +473,50 @@ RIWAYAT CLIMAX:
 └───────────────────────────────────────────────────────────────────────────────┘
 """
     
-        return f"""
+    return f"""
 ╔═══════════════════════════════════════════════════════════════════════════════╗
-║                         📝 MEMORY ROLE - JANGAN LUPA!                          ║
+║                    🧠 MEMORY {self.character_name.upper()} - JANGAN LUPA!                  ║
 ╚═══════════════════════════════════════════════════════════════════════════════╝
 
-{self.get_mas_clothing_context()}
+{clothing_warning}
 
 ┌───────────────────────────────────────────────────────────────────────────────┐
-│ 📍 POSISI & GERAKAN:                                                          │
+│ 📍 POSISI & GERAKAN                                                           │
 ├───────────────────────────────────────────────────────────────────────────────┤
-│ • {self.get_position_context()}                                               │
-│ • {self.get_movement_context()}                                               │
+│ {self.get_position_context()}                                                 │
+│ {self.get_movement_context()}                                                 │
 └───────────────────────────────────────────────────────────────────────────────┘
 
 ┌───────────────────────────────────────────────────────────────────────────────┐
-│ 🫀 KONDISI TUBUH:                                                             │
+│ 🫀 KONDISI TUBUH                                                              │
 ├───────────────────────────────────────────────────────────────────────────────┤
-│ • Napas: {napas_desc.get(self.body_state['napas'], self.body_state['napas'])} │
-│ • Suhu: {suhu_desc.get(self.body_state['suhu'], self.body_state['suhu'])}     │
-│ • Gemetar: {'Ya' if self.body_state['gemetar'] else 'Tidak'}                  │
-│ • Keringat: {self.body_state['keringat']}                                     │
-│ • Detak jantung: {self.body_state['detak_jantung']}                           │
+│ {self.get_body_state_context()}                                               │
 └───────────────────────────────────────────────────────────────────────────────┘
 
 ┌───────────────────────────────────────────────────────────────────────────────┐
-│ 💖 PERASAAN & EKSPRESI:                                                       │
+│ 💖 PERASAAN & EKSPRESI                                                        │
 ├───────────────────────────────────────────────────────────────────────────────┤
-│ • {self.get_feeling_context()}                                                │
-│ • {self.get_expression_context()}                                             │
+│ {self.get_feeling_context()}                                                  │
+│ {self.get_expression_context()}                                               │
 └───────────────────────────────────────────────────────────────────────────────┘
 
 ┌───────────────────────────────────────────────────────────────────────────────┐
-│ 📝 PERCAKAPAN TERAKHIR (5):                                                   │
+│ 📝 PERCAKAPAN TERAKHIR                                                        │
 ├───────────────────────────────────────────────────────────────────────────────┤
 │ {self.get_recent_context(5)}                                                  │
 └───────────────────────────────────────────────────────────────────────────────┘
 
 ┌───────────────────────────────────────────────────────────────────────────────┐
-│ 💦 CLIMAX:                                                                    │
+│ 💦 CLIMAX                                                                     │
 ├───────────────────────────────────────────────────────────────────────────────┤
 │ {self.get_climax_context()}                                                   │
 └───────────────────────────────────────────────────────────────────────────────┘
 
-╔═══════════════════════════════════════════════════════════════════════════════╗
-║ ⚠️ ATURAN KONSISTENSI WAJIB (JANGAN LUPA!):                                   ║
-╠═══════════════════════════════════════════════════════════════════════════════╣
-║ 1. LANJUTKAN dari posisi terakhir: {self.last_position or 'belum ada'}                │
-║ 2. LANJUTKAN gerakan: {self.last_movement or 'belum ada'} dengan kecepatan {self.last_speed} │
-║ 3. JANGAN LUPA kondisi tubuhmu: napas {self.body_state['napas']}                       │
-║ 4. JANGAN MUNDUR! Mas SUDAH TELANJANG dari awal sesi!                          │
-║ 5. JANGAN PERNAH minta Mas buka celana lagi!                                  │
-║ 6. LANJUTKAN dari percakapan terakhir, jangan ulang dari awal!                │
-╚═══════════════════════════════════════════════════════════════════════════════╝
+⚠️ ATURAN KONSISTENSI WAJIB:
+1. LANJUTKAN dari posisi terakhir: {self.last_position or 'belum ada'}
+2. LANJUTKAN gerakan: {self.last_movement or 'belum ada'} dengan kecepatan {self.last_speed}
+3. JANGAN LUPA kondisi tubuhmu: napas {self.body_state.get('napas', 'stabil')}
+4. JANGAN LUPA perasaanmu: {self.current_feeling or 'normal'}
+5. JANGAN MUNDUR waktu! Lanjutkan dari percakapan terakhir!
+6. JANGAN PERNAH minta Mas buka celana! Mas SUDAH TELANJANG!
 """
