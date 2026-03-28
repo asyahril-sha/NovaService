@@ -26,6 +26,7 @@ class ServicePhase(str, Enum):
     GREETING = "greeting"             # menyapa
     REFLEX_BACK = "reflex_back"       # pijat belakang
     REFLEX_FRONT = "reflex_front"     # pijat depan
+    VITALITAS_OFFER = "vitalitas_offer"   # ← TAMBAHKAN INI
     HANDJOB = "handjob"               # HJ
     BJ = "bj"                         # Blowjob
     SEX = "sex"                       # Sex
