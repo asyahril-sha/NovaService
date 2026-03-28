@@ -26,7 +26,13 @@ class PelacurMemory:
     
     def __init__(self, character_name: str = "Nova"):
         self.character_name = character_name
-        
+
+        # ========== CLOTHING STATE ==========
+    self.mas_clothing = {
+        'celana': 'sudah dibuka',      # 'masih pakai', 'sudah dibuka'
+        'cd': 'sudah dibuka',           # 'masih pakai', 'sudah dibuka'
+        'baju': 'sudah dibuka',          # 'masih pakai', 'sudah dibuka'
+}
         # ========== POSITION MEMORY ==========
         self.last_position: Optional[str] = None
         self.position_history: List[Dict] = []  # [{position, time, phase}]
@@ -81,8 +87,11 @@ class PelacurMemory:
         
         logger.info(f"🧠 PelacurMemory initialized for {character_name}")
 
-    # service/pelacur_memory.py
-    # Tambahkan method ini di dalam class PelacurMemory
+    def update_mas_clothing(self, item: str, status: str):
+        """Update status pakaian Mas"""
+        if item in self.mas_clothing:
+            self.mas_clothing[item] = status
+            logger.info(f"👕 Mas clothing updated: {item} = {status}")
 
     def update_from_mas(self, pesan_mas: str):
         """
