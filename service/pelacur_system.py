@@ -1,6 +1,7 @@
 # service/pelacur_system.py
 """
 Pelacur System - Main Process, Start, Loop, Climax, Warning
+FIXED: Multiple inheritance dari PelacurAuto dan PelacurManual
 """
 
 import asyncio
@@ -10,30 +11,58 @@ from typing import Optional
 
 from core import ServicePhase
 from service.pelacur_core import PelacurCore
+from service.pelacur_auto import PelacurAuto
+from service.pelacur_manual import PelacurManual
 
 logger = logging.getLogger(__name__)
 
 
-class PelacurSystem(PelacurCore):
+class PelacurSystem(PelacurAuto, PelacurManual):
     """
     System class untuk Pelacur Flow
+    Multiple inheritance dari:
+    - PelacurAuto: auto phase (BJ, Kissing)
+    - PelacurManual: manual phase (7 fase)
+    - PelacurCore: base class (via inheritance chain)
+    
     Berisi: Main process, start session, loop system, climax detection, warning system
     """
     
+    def __init__(self, character):
+        """Inisialisasi PelacurSystem dengan multiple inheritance"""
+        # Panggil init dari parent classes
+        # Python MRO akan menangani urutan dengan benar
+        super().__init__(character)
+        
+        # ========== BOOKING STATE (SUDAH ADA DI CORE) ==========
+        # self.is_active, self.booking_start_time, dll sudah di-set di PelacurCore.__init__
+        
+        # ========== PHASE STATE (SUDAH ADA DI CORE) ==========
+        # self.current_phase_name, self.auto_send_active, dll
+        
+        # ========== WAITING FOR RESPONSE (SUDAH ADA DI CORE) ==========
+        # self.waiting_for_response, self.waiting_for_type, dll
+        
+        # ========== WARNING TRACKING (SUDAH ADA DI CORE) ==========
+        # self._sent_warnings
+        
+        logger.info(f"🔥 PelacurSystem initialized for {character.name}")
+        logger.info(f"   Inherited from: PelacurAuto, PelacurManual")
+    
     # =========================================================================
-    # CLIMAX DETECTION (NATURAL - TANPA MINTA IZIN)
+    # CLIMAX DETECTION (NATURAL - OVERRIDE UNTUK KONSISTENSI)
     # =========================================================================
     
     async def _check_role_natural_climax(self) -> Optional[str]:
         """
         Cek apakah role natural climax
-        Role bisa climax kapan saja jika arousal > 85
-        TANPA minta izin, langsung climax dengan narasi
+        Override dari PelacurManual untuk konsistensi dengan system
         """
-        if self.role_climax_count >= 10:  # Maksimal 10x climax dalam sesi
-            return None
-        
         arousal = self.character.emotional.arousal
+        
+        # Maksimal 10x climax dalam sesi
+        if self.role_climax_count >= 10:
+            return None
         
         # Arousal > 85 = role climax natural
         if arousal >= 85:
@@ -45,10 +74,10 @@ class PelacurSystem(PelacurCore):
             self.last_climax_time = time.time()
             
             # Record ke memory
-            self.memory.record_climax(is_mas=False, location="", intensity="heavy")
+            self.memory.record_climax(is_mas=False, location="", intensity="heavy" if arousal >= 90 else "normal")
             
             # Update emotional engine
-            self.character.emotional.climax(is_heavy=True)
+            self.character.emotional.climax(is_heavy=(arousal >= 90))
             
             # Update memory body state
             self.memory.update_body_state(
@@ -60,8 +89,8 @@ class PelacurSystem(PelacurCore):
             self.memory.update_feeling('puas', 100)
             
             # Build climax scene
-            intensity = "heavy" if arousal >= 95 else "normal"
-            climax_scene = self._build_natural_climax_scene(is_mas=False, intensity=intensity)
+            intensity = "heavy" if arousal >= 90 else "normal"
+            climax_scene = self._build_climax_scene(is_mas=False, intensity=intensity)
             
             logger.info(f"💦 ROLE NATURAL CLIMAX #{self.role_climax_count} (arousal: {arousal:.0f}%)")
             
@@ -72,7 +101,7 @@ class PelacurSystem(PelacurCore):
     async def _check_mas_climax(self, pesan_mas: str) -> Optional[str]:
         """
         Deteksi climax Mas dari pesan
-        Mas bisa climax kapan saja, langsung terdeteksi
+        Override dari PelacurManual untuk konsistensi dengan system
         """
         msg_lower = pesan_mas.lower()
         
@@ -95,10 +124,10 @@ class PelacurSystem(PelacurCore):
             self.memory.record_climax(is_mas=True, location=location, intensity=intensity)
             
             # Update emotional engine
-            self.character.emotional.add_stimulation("Mas climax", 8)
+            self.character.emotional.add_stimulation("Mas climax", 8 if intensity == "heavy" else 5)
             
             # Build climax scene
-            climax_scene = self._build_natural_climax_scene(is_mas=True, intensity=intensity, location=location)
+            climax_scene = self._build_climax_scene(is_mas=True, intensity=intensity, location=location)
             
             logger.info(f"💦 MAS CLIMAX #{self.mas_climax_count} - location: {location}")
             
@@ -125,18 +154,19 @@ class PelacurSystem(PelacurCore):
         
         return "tidak disebut"
     
-    def _build_natural_climax_scene(self, is_mas: bool, intensity: str = "normal", location: str = "") -> str:
+    def _build_climax_scene(self, is_mas: bool = False, intensity: str = "normal", location: str = "") -> str:
         """Bangun scene climax natural"""
         name = self.character.name
         panggilan = getattr(self.character, 'panggilan', 'Mas')
         
         if is_mas:
             if intensity == "heavy":
+                loc_text = f" {location}" if location else ""
                 return f"""*{name} merasakan kontol Mas mengeras hebat, denyutnya kencang, lalu meletus dengan deras*
 
 "Ahhh! {panggilan}! keluar... banyak banget..."
 
-*Dia terus bergerak sampai Mas climax puas, cairan hangat memenuhi {location if location else 'tubuhnya'}*
+*Dia terus bergerak sampai Mas climax puas, cairan hangat memenuhi{loc_text}*
 
 "Enak ya {panggilan}..." """
             else:
@@ -243,7 +273,7 @@ class PelacurSystem(PelacurCore):
         self.auto_send_active = True
         self.manual_mode_active = False
         
-        # Mulai auto-send task
+        # Mulai auto-send task (method dari PelacurAuto)
         await self._start_auto_send_task()
         
         # Generate scene pertama BJ
@@ -463,77 +493,6 @@ class PelacurSystem(PelacurCore):
         return transitions.get(key, f"*{name} lanjut ke fase berikutnya*")
     
     # =========================================================================
-    # MANUAL MODE HANDLERS (DUMMY - AKAN DIIMPLEMENTASI DI pelacur_manual.py)
-    # =========================================================================
-    # Method-method ini akan di-override oleh class di pelacur_manual.py
-    # Saya buat dummy agar tidak error saat inherit
-    
-    async def _handle_foreplay_manual(self, pesan_mas: str) -> str:
-        """Dummy - akan diimplementasikan di pelacur_manual.py"""
-        memory_context = self.memory.get_full_context()
-        prompt = self.prompt_builder.build_manual_prompt("foreplay_mas", pesan_mas, memory_context)
-        return await self._generate_scene(prompt)
-    
-    async def _handle_cowgirl_manual(self, pesan_mas: str) -> str:
-        """Dummy - akan diimplementasikan di pelacur_manual.py"""
-        memory_context = self.memory.get_full_context()
-        prompt = self.prompt_builder.build_manual_prompt("cowgirl", pesan_mas, memory_context)
-        return await self._generate_scene(prompt)
-    
-    async def _handle_cunnilingus_manual(self, pesan_mas: str) -> str:
-        """Dummy - akan diimplementasikan di pelacur_manual.py"""
-        memory_context = self.memory.get_full_context()
-        prompt = self.prompt_builder.build_manual_prompt("cunnilingus", pesan_mas, memory_context)
-        return await self._generate_scene(prompt)
-    
-    async def _handle_missionary_manual(self, pesan_mas: str) -> str:
-        """Dummy - akan diimplementasikan di pelacur_manual.py"""
-        memory_context = self.memory.get_full_context()
-        prompt = self.prompt_builder.build_manual_prompt("missionary", pesan_mas, memory_context)
-        return await self._generate_scene(prompt)
-    
-    async def _handle_doggy_manual(self, pesan_mas: str) -> str:
-        """Dummy - akan diimplementasikan di pelacur_manual.py"""
-        memory_context = self.memory.get_full_context()
-        prompt = self.prompt_builder.build_manual_prompt("doggy", pesan_mas, memory_context)
-        return await self._generate_scene(prompt)
-    
-    async def _handle_position_change_manual(self, pesan_mas: str) -> str:
-        """Dummy - akan diimplementasikan di pelacur_manual.py"""
-        memory_context = self.memory.get_full_context()
-        prompt = self.prompt_builder.build_manual_prompt("position_change", pesan_mas, memory_context)
-        return await self._generate_scene(prompt)
-    
-    async def _handle_aftercare_manual(self, pesan_mas: str) -> str:
-        """Dummy - akan diimplementasikan di pelacur_manual.py"""
-        memory_context = self.memory.get_full_context()
-        prompt = self.prompt_builder.build_manual_prompt("aftercare", pesan_mas, memory_context)
-        return await self._generate_scene(prompt)
-    
-    # =========================================================================
-    # AUTO SEND TASK (DUMMY - AKAN DIIMPLEMENTASI DI pelacur_auto.py)
-    # =========================================================================
-    
-    async def _start_auto_send_task(self):
-        """Dummy - akan diimplementasikan di pelacur_auto.py"""
-        logger.info("Auto send task dummy - akan diimplementasikan di pelacur_auto.py")
-        pass
-    
-    async def _generate_bj_auto_scene(self) -> str:
-        """Dummy - akan diimplementasikan di pelacur_auto.py"""
-        memory_context = self.memory.get_full_context()
-        prompt = self.prompt_builder.build_auto_prompt("bj", self.scene_count + 1, self.BJ_SCENES)
-        prompt = f"{memory_context}\n\n{prompt}"
-        return await self._generate_scene(prompt)
-    
-    async def _generate_kissing_auto_scene(self) -> str:
-        """Dummy - akan diimplementasikan di pelacur_auto.py"""
-        memory_context = self.memory.get_full_context()
-        prompt = self.prompt_builder.build_auto_prompt("kissing", self.scene_count + 1, self.KISSING_SCENES)
-        prompt = f"{memory_context}\n\n{prompt}"
-        return await self._generate_scene(prompt)
-    
-    # =========================================================================
     # MAIN PROCESS
     # =========================================================================
     
@@ -696,26 +655,26 @@ class PelacurSystem(PelacurCore):
         return None
     
     async def _handle_manual_by_type(self, pesan_mas: str) -> str:
-        """Handle manual mode berdasarkan tipe"""
+        """Handle manual mode berdasarkan tipe (method dari PelacurManual)"""
         if self.manual_mode_type == "foreplay_mas":
-            return await self._handle_foreplay_manual(pesan_mas)
+            return await self.handle_foreplay(pesan_mas)
         elif self.manual_mode_type == "cowgirl":
-            return await self._handle_cowgirl_manual(pesan_mas)
+            return await self.handle_cowgirl(pesan_mas)
         elif self.manual_mode_type == "cunnilingus":
-            return await self._handle_cunnilingus_manual(pesan_mas)
+            return await self.handle_cunnilingus(pesan_mas)
         elif self.manual_mode_type == "missionary":
-            return await self._handle_missionary_manual(pesan_mas)
+            return await self.handle_missionary(pesan_mas)
         elif self.manual_mode_type == "doggy":
-            return await self._handle_doggy_manual(pesan_mas)
+            return await self.handle_doggy(pesan_mas)
         elif self.manual_mode_type == "position_change":
-            return await self._handle_position_change_manual(pesan_mas)
+            return await self.handle_position_change(pesan_mas)
         elif self.manual_mode_type == "aftercare":
-            return await self._handle_aftercare_manual(pesan_mas)
+            return await self.handle_aftercare(pesan_mas)
         
         return f"*{self.character.name} tersenyum, menunggu Mas*"
     
     async def _process_auto_phase(self) -> Optional[str]:
-        """Process auto phase (BJ atau Kissing)"""
+        """Process auto phase (method dari PelacurAuto)"""
         # Cek apakah auto phase selesai
         if self._is_auto_phase_complete():
             self.auto_send_active = False
@@ -761,7 +720,8 @@ class PelacurSystem(PelacurCore):
             self.aftercare_active = False
             return await self._start_next_cycle()
         
-        return self._build_aftercare_message()
+        # Gunakan method aftercare dari PelacurManual
+        return await self.handle_aftercare(pesan_mas)
     
     # =========================================================================
     # START SESSION
