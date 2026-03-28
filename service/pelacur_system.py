@@ -727,27 +727,28 @@ class PelacurSystem(PelacurAuto, PelacurManual):
     # START SESSION
     # =========================================================================
     
-    async def start(self, location: str = "ruang tamu", price: int = 10000000) -> str:
+    async def start(self, location: str = "ruang tamu", price: int = 10000000, duration_hours: int = None) -> str:
         """
-        Mulai sesi pelacur 6 jam
-        
+        Mulai sesi pelacur
+    
         Args:
             location: Lokasi booking (ruang tamu, hotel, dll)
-            price: Harga booking (default 10jt)
+            price: Harga booking
+            duration_hours: Durasi booking dalam jam (opsional, default 6 jam)
         """
         self.is_active = True
         self.current_phase = ServicePhase.GREETING
         self.booking_start_time = time.time()
-
+    
         # Gunakan duration_hours jika diberikan,否则 pakai default 6 jam
         if duration_hours is not None:
-        self.TOTAL_BOOKING_HOURS = duration_hours
-        self.TOTAL_BOOKING_SECONDS = duration_hours * 3600
-        
+            self.TOTAL_BOOKING_HOURS = duration_hours
+            self.TOTAL_BOOKING_SECONDS = duration_hours * 3600
+    
         self.booking_end_time = self.booking_start_time + self.TOTAL_BOOKING_SECONDS
         self.cycle_start_time = self.booking_start_time
         self.current_cycle = 1
-        
+    
         # Reset semua state
         self.current_phase_name = "confirmation"
         self.auto_send_active = False
@@ -758,21 +759,21 @@ class PelacurSystem(PelacurAuto, PelacurManual):
         self.mas_climax_count = 0
         self.role_climax_count = 0
         self._sent_warnings = []
-        
+    
         # Set booking info ke character
         self.character.booking_location = location
         self.character.booking_price = price
         self.character.booking_duration = self.TOTAL_BOOKING_HOURS
-        
+    
         # Reset memory
         self.memory = PelacurMemory(self.character.name)
-        
+    
         self.character.tracker.add_to_timeline(
             f"Sesi Pelacur dimulai - {self.TOTAL_BOOKING_HOURS} jam di {location}",
             f"Harga: Rp{price:,}"
         )
-        
+    
         logger.info(f"🔥 Pelacur session started: {self.TOTAL_BOOKING_HOURS}h at {location}")
         logger.info(f"   Booking ends at: {time.ctime(self.booking_end_time)}")
-        
+    
         return self._build_start_confirmation()
