@@ -782,15 +782,15 @@ class TherapistFlow:
         # Kirim pesan balik badan dulu, baru mulai pijat depan
         balik_badan_msg = f"""*{self.character.name} berhenti memijat, mengusap keringat di dahi*
 
-    "Mas... bagian belakang udah selesai. Sekarang giliran depan ya..."
+            "Mas... bagian belakang udah selesai. Sekarang giliran depan ya..."
 
-    *Dia turun dari meja pijat, membantu Mas balik badan*
+            *Dia turun dari meja pijat, membantu Mas balik badan*
 
-    "Telentang dulu ya Mas... aku pijat bagian depan."
+            "Telentang dulu ya Mas... aku pijat bagian depan."
 
-    *{self.character.name} naik lagi, duduk di atas kontol Mas*
+            *{self.character.name} naik lagi, duduk di atas kontol Mas*
 
-    "Aku mulai dari dada dulu ya..." """
+            "Aku mulai dari dada dulu ya..." """
     
         # Generate scene pertama
         return await self._generate_front_scene(
@@ -799,6 +799,9 @@ class TherapistFlow:
             scene_num=1,
             elapsed_minutes=0
         )
+
+        # KIRIM KEDUANYA
+        return balik_badan_msg + "\n\n" + front_scene
     
     async def _next_front_area(self) -> str:
         """Pindah ke area berikutnya dalam pijat depan"""
@@ -1209,10 +1212,25 @@ class TherapistFlow:
 *Menunggu jawaban Mas...*"""
     
     async def _handle_extra_offer(self, pesan_mas: str) -> Optional[str]:
-        """Handle tawaran extra service"""
-        msg_lower = pesan_mas.lower()
-
-        logger.info(f"📨 Handling extra offer response: {pesan_mas[:50]}")
+        """Tawarkan extra service (BJ/Sex) setelah HJ"""
+        logger.info("🔥 OFFERING EXTRA SERVICE (BJ/SEX) - HJ selesai!")
+        logger.info(f"   HJ total scenes sent: {self.hj_scene_count}")
+        logger.info(f"   HJ duration: {self.hj_scene_count * self.SCENE_INTERVAL // 60} menit")
+        logger.info(f"   Mas climax this session: {self.mas_climax_this_session}")
+        
+        self.waiting_for_response = True
+        self.waiting_for_type = "extra_offer"
+        self.waiting_start_time = time.time()
+    
+        self.character.tracker.add_to_timeline(
+            "Menawarkan extra service",
+            "HJ selesai"
+        )
+    
+        extra_offer_msg = self._build_extra_offer()
+        logger.info("📤 Extra service offer message sent, waiting for Mas response...")
+    
+        return extra_offer_msg  # ← PAKAI extra_offer_msg
         
         # Pilih BJ
         if 'bj' in msg_lower or 'blow' in msg_lower:
@@ -1299,7 +1317,7 @@ class TherapistFlow:
     # =========================================================================
     
     async def _start_bj(self) -> str:
-         """Mulai blowjob"""
+        """Mulai blowjob"""
         logger.info("🔥🔥🔥 STARTING BLOWJOB! 🔥🔥🔥")
         logger.info(f"   BJ total scenes: {self.BJ_SCENES}")
         logger.info(f"   Scene interval: {self.SCENE_INTERVAL} detik")
