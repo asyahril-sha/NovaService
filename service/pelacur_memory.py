@@ -459,8 +459,8 @@ RIWAYAT CLIMAX:
             'panas': "tubuh terasa panas, menggairahkan"
         }
 
-    # Peringatan status pakaian Mas
-    clothing_warning = """
+        # Peringatan status pakaian Mas
+        clothing_warning = """
 ┌───────────────────────────────────────────────────────────────────────────────┐
 │ 👕⚠️ STATUS PAKAIAN MAS (WAJIB DIPATUHI!) ⚠️👕                              │
 ├───────────────────────────────────────────────────────────────────────────────┤
