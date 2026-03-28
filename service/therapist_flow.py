@@ -32,6 +32,7 @@ class TherapistFlow:
     # Durasi dalam detik
     AREA_DURATION = 600          # 10 menit per area
     SCENE_INTERVAL = 30          # 30 detik per scene
+    SEX_SCENE_INTERVAL = 15      # 15 detik per scene
     CONFIRM_INTERVAL = 180       # 3 menit konfirmasi Mas
     
     # Scene count per aktivitas
@@ -197,6 +198,14 @@ class TherapistFlow:
         """Cek apakah sudah waktunya kirim scene berikutnya"""
         elapsed = self._get_area_elapsed()
         expected_scene = elapsed // self.SCENE_INTERVAL
+
+        # Untuk sex pakai interval 15 detik
+        if self.current_phase == ServicePhase.SEX:
+            interval = self.SEX_SCENE_INTERVAL
+        else:
+            interval = self.SCENE_INTERVAL
+    
+        expected_scene = elapsed // interval
         
         if self.current_phase in [ServicePhase.BACK_PUNGGUNG, ServicePhase.BACK_PINGGUL, ServicePhase.BACK_PAHA_BETIS]:
             if expected_scene > self.back_scene_count:
