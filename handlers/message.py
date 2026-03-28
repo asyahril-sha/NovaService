@@ -43,33 +43,35 @@ async def message_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     
     logger.info(f"📌 Mode: {mode}, Active Role: {active_role}")
     
-    # ========== ROLE MODE ==========
+    # handlers/message.py bagian role mode
+
     if mode == 'role' and active_role:
         try:
-            from roles.manager import get_role_manager
-            role_manager = get_role_manager()
-            role = role_manager.get_role(user_id)
-            
+            from commands.role import get_user_role
+            role = get_user_role(user_id)
+        
             if not role:
                 await update.message.reply_text(
                     "💜 Role belum aktif. Silakan pilih role dulu dengan **/role therapist** atau **/role pelacur**",
                     parse_mode='Markdown'
                 )
                 return
-            
+        
             # Proses pesan ke role
-            from service.therapist_flow import process_therapist_message
-            from service.pelacur_flow import process_pelacur_message
-            
+            from service.therapist_flow import TherapistFlow
+            from service.pelacur_flow import PelacurFlow
+        
             if active_role == "therapist":
-                response = await process_therapist_message(role, pesan)
+                flow = TherapistFlow(role)
+                response = await flow.process(pesan)
             elif active_role == "pelacur":
-                response = await process_pelacur_message(role, pesan)
+                flow = PelacurFlow(role)
+                response = await flow.process(pesan)
             else:
                 response = f"*{role.name} tersenyum*\n\n\"{role.panggilan}... ada yang bisa dibantu?\""
-            
+        
             await update.message.reply_text(response, parse_mode='Markdown')
-            
+        
         except Exception as e:
             logger.error(f"Role chat error: {e}", exc_info=True)
             await update.message.reply_text(
