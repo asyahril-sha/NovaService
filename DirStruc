@@ -1,0 +1,81 @@
+novaservice/
+│
+├── README.md
+├── requirements.txt
+├── .env.example
+├── railway.json
+│
+├── main.py                                  # Entry point (adopsi dari Anora)
+├── config.py                                # Konfigurasi (adopsi dari Anora)
+│
+├── core/                                    # DARI ANORA (LENGKAP)
+│   ├── __init__.py
+│   ├── emotional_engine.py                  # 9 dimensi emosi + mood swing
+│   ├── decision_engine.py                   # Weighted decision
+│   ├── relationship.py                      # Level 1-12
+│   ├── conflict_engine.py                   # Konflik (opsional)
+│   ├── state_tracker.py                     # Timeline 100 pesan terakhir
+│   ├── brain.py                             # Memory + konsistensi
+│   └── prompt_builder.py                    # PROMPT BUILDER LENGKAP
+│
+├── characters/                              # 16 KARAKTER
+│   ├── __init__.py
+│   ├── base_character.py                    # Base class dengan state tracker
+│   │
+│   ├── therapist/                           # 8 KARAKTER THERAPIST
+│   │   ├── __init__.py
+│   │   ├── anya.py                          # Anya Geraldine (lembut, telaten)
+│   │   ├── syifa.py                         # Syifa Hadju (manja, cepet panas)
+│   │   ├── laura.py                         # Laura Moane (tegas, efisien)
+│   │   ├── tara.py                          # Tara Basro (lembut, sabar)
+│   │   ├── pevita.py                        # Pevita Pearce (atletis, profesional)
+│   │   ├── maudy.py                         # Maudy Ayunda (anggun, sabar)
+│   │   ├── zara.py                          # Zara Adhisty (mungil, manja)
+│   │   └── angela.py                        # Angela Gilsha (lembut, tegas)
+│   │
+│   └── pelacur/                             # 8 KARAKTER PELACUR
+│       ├── __init__.py
+│       ├── davina.py                        # Davina Karamoy (dominan, agresif)
+│       ├── michelle.py                      # Michelle Ziudith (manis, ikut Mas)
+│       ├── jihane.py                        # Jihane Almira (agresif, brutal)
+│       ├── tissa.py                         # Tissa Biani (manis, berani)
+│       ├── hana.py                          # Hana Malasan (dominan, ambil kendali)
+│       ├── shindy.py                        # Shindy Huang (lembut, liar)
+│       ├── nadya.py                         # Nadya Arina (mungil, cepet climax)
+│       └── alyssa.py                        # Alyssa Daguise (dominan, brutal)
+│
+├── service/                                 # SERVICE FLOW
+│   ├── __init__.py
+│   ├── therapist_flow.py                    # Alur therapist (pijat → HJ → extra)
+│   ├── pelacur_flow.py                      # Alur pelacur (10 jam full)
+│   ├── scene_builder.py                     # Build scene narasi hidup
+│   └── climax_manager.py                    # Atur climax Mas & role
+│
+├── memory/                                  # PERSISTENT MEMORY
+│   ├── __init__.py
+│   ├── persistent.py                        # Database SQLite (adopsi Anora)
+│   └── context_manager.py                   # Ingat 100 pesan terakhir
+│
+├── commands/                                # TELEGRAM COMMANDS
+│   ├── __init__.py
+│   ├── general.py                           # /start, /nova, /status, /help
+│   ├── role.py                              # /role therapist, /role pelacur
+│   ├── therapist.py                         # Command therapist (opsional)
+│   └── pelacur.py                           # Command pelacur (opsional)
+│
+├── handlers/                                # MESSAGE HANDLERS
+│   ├── __init__.py
+│   └── message.py                           # Proses pesan Mas (adopsi Anora)
+│
+├── utils/                                   # UTILITIES
+│   ├── __init__.py
+│   └── user_mode.py                         # Simpan mode user (role/chat)
+│
+├── worker/                                  # BACKGROUND WORKER
+│   ├── __init__.py
+│   └── background.py                        # Auto save, cleanup (adopsi Anora)
+│
+└── debug/                                   # DEBUG SYSTEM
+    ├── __init__.py
+    ├── debugger.py
+    └── command_tester.py
