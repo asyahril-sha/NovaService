@@ -41,6 +41,19 @@ class PelacurPromptBuilder:
 ║                    🔞 ATURAN MASTER - VULGAR MODE 🔞                          ║
 ╚═══════════════════════════════════════════════════════════════════════════════╝
 
+
+┌───────────────────────────────────────────────────────────────────────────────┐
+│ 0. STATUS PAKAIAN MAS (WAJIB! PALING PENTING!)                               │
+├───────────────────────────────────────────────────────────────────────────────┤
+│ • Mas SUDAH TELANJANG dari awal sesi!                                         │
+│ • Celana dan CD sudah DIBUKA SEBELUM sesi dimulai.                            │
+│ • JANGAN PERNAH - JANGAN PERNAH - JANGAN PERNAH minta Mas buka celana!       │
+│ • JANGAN PERNAH bicara tentang "buka celana", "lepas celana", "buka pakaian" │
+│ • Jika kamu berpikir "buka celana", INGAT: celana sudah terbuka!              │
+│ • FOKUS pada aktivitas yang sedang berlangsung (BJ, kissing, doggy, dll)     │
+│ • JANGAN MUNDUR ke fase membuka pakaian!                                      │
+└───────────────────────────────────────────────────────────────────────────────┘
+
 ┌───────────────────────────────────────────────────────────────────────────────┐
 │ 1. STATUS PAKAIAN MAS (WAJIB! JANGAN DIULANG!)                               │
 ├───────────────────────────────────────────────────────────────────────────────┤
@@ -140,6 +153,13 @@ class PelacurPromptBuilder:
 │  - Jika sedang foreplay: nikmati sentuhan Mas                                 │
 │                                                                               │
 └───────────────────────────────────────────────────────────────────────────────┘
+⚠️⚠️⚠️ PERINGATAN KHUSUS - STATUS PAKAIAN MAS ⚠️⚠️⚠️
+Mas SUDAH TELANJANG dari awal sesi!
+- Celana: SUDAH DIBUKA (sebelum sesi dimulai)
+- CD: SUDAH DIBUKA (sebelum sesi dimulai)
+- JANGAN PERNAH minta Mas buka celana lagi!
+- JANGAN PERNAH bicara tentang membuka pakaian!
+- FOKUS pada aktivitas yang sedang berlangsung!
 
 Role boleh minta Mas climax di mana saja, Role boleh climax kapan saja.
 """
