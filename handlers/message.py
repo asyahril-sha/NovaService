@@ -43,41 +43,31 @@ async def message_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     
     logger.info(f"📌 Mode: {mode}, Active Role: {active_role}")
     
-    # handlers/message.py bagian role mode
-
+    # ========== ROLE MODE ==========
     if mode == 'role' and active_role:
         try:
-            from commands.role import get_user_role
+            from commands.role import get_user_role, get_user_flow
+            
             role = get_user_role(user_id)
-        
-            if not role:
+            flow = get_user_flow(user_id)
+            
+            if not role or not flow:
                 await update.message.reply_text(
                     "💜 Role belum aktif. Silakan pilih role dulu dengan **/role therapist** atau **/role pelacur**",
                     parse_mode='Markdown'
                 )
                 return
-        
-            # Proses pesan ke role
-            from service.therapist_flow import TherapistFlow
-            from service.pelacur_flow import PelacurFlow
-
+            
             logger.info(f"Processing message for role: {active_role}, character: {role.name}")
-        
-            if active_role == "therapist":
-                flow = TherapistFlow(role)
-                response = await flow.process(pesan)
-            elif active_role == "pelacur":
-                flow = PelacurFlow(role)
-                response = await flow.process(pesan)
-            else:
-                response = f"*{role.name} tersenyum*\n\n\"{role.panggilan}... ada yang bisa dibantu?\""
-        
+            
+            # Gunakan flow yang sudah ada
+            response = await flow.process(pesan)
             await update.message.reply_text(response, parse_mode='Markdown')
-        
+            
         except Exception as e:
             logger.error(f"Role chat error: {e}", exc_info=True)
             await update.message.reply_text(
-                "Maaf, ada error. Coba lagi ya, Mas.",
+                f"❌ Error: {str(e)}",
                 parse_mode='Markdown'
             )
         return
