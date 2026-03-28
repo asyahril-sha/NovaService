@@ -60,6 +60,8 @@ async def message_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
             # Proses pesan ke role
             from service.therapist_flow import TherapistFlow
             from service.pelacur_flow import PelacurFlow
+
+            logger.info(f"Processing message for role: {active_role}, character: {role.name}")
         
             if active_role == "therapist":
                 flow = TherapistFlow(role)
