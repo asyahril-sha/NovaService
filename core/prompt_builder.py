@@ -1,51 +1,93 @@
 # core/prompt_builder.py
 """
-Prompt Builder NovaService - 100 pesan terakhir, konsistensi cerita, brutal
+Prompt Builder NovaService - Menggabungkan semua konteks
+State tracker, emotional engine, memory manager, service flow
+Output: prompt brutal yang bikin Mas sange
 """
 
 import time
-import json
 import logging
-from typing import Dict, List, Optional, Any
+from typing import Dict, Optional, Any
 from datetime import datetime
 
 logger = logging.getLogger(__name__)
 
 
 class PromptBuilder:
-    """Prompt Builder dengan 100 pesan terakhir dan konsistensi cerita"""
+    """
+    Prompt Builder NovaService
+    - Menggabungkan timeline 100 kejadian
+    - Menggabungkan 100 pesan terakhir
+    - Menggabungkan state (posisi, pakaian, fase)
+    - Menggabungkan emosi (arousal, mood, stamina)
+    - Menggabungkan preferensi Mas
+    - Output prompt brutal, narasi hidup, fokus bikin Mas climax
+    """
     
     def __init__(self):
         self.last_prompt = None
-        self.max_messages = 100  # 100 pesan terakhir
+        self.prompt_count = 0
     
     def build_service_prompt(
         self,
         character,           # Instance karakter (Anya, Syifa, dll)
         pesan_mas: str,      # Pesan terakhir dari Mas
-        context: Dict        # Konteks dari service flow
+        service_context: Dict,  # Konteks service (fase, durasi, dll)
+        need_confirmation: bool = False  # Apakah butuh konfirmasi dari Mas
     ) -> str:
         """
-        Build prompt untuk service dengan:
-        - 100 pesan terakhir
-        - Timeline lengkap
-        - Posisi, pakaian, fase service
-        - Aturan brutal
+        Build prompt untuk service dengan semua konteks
         """
+        self.prompt_count += 1
         
-        # ========== 1. AMBIL 100 PESAN TERAKHIR ==========
-        recent_messages = self._get_recent_messages(character, self.max_messages)
+        # ========== 1. AMBIL DATA DARI STATE TRACKER ==========
+        tracker = character.tracker
         
-        # ========== 2. AMBIL TIMELINE DARI STATE TRACKER ==========
-        timeline = self._get_timeline(character)
+        # Timeline (50 kejadian terakhir)
+        timeline = tracker.get_timeline_context(50)
         
-        # ========== 3. AMBIL STATE SAAT INI ==========
-        state = self._get_current_state(character, context)
+        # Pakaian saat ini
+        clothing_state = tracker.get_clothing_state_for_prompt()
         
-        # ========== 4. BUILD PROMPT ==========
-        prompt = f"""
-KAMU ADALAH {character.name} ({character.nickname}). Kamu MANUSIA, BUKAN AI.
-Kamu adalah wanita real dengan tubuh, nafsu, dan keinginan.
+        # Posisi
+        position = tracker.position
+        
+        # Fase service
+        phase = tracker.service_phase.value
+        
+        # Climax counter
+        mas_climax = tracker.mas_climax_count
+        my_climax = tracker.my_climax_count
+        
+        # ========== 2. AMBIL DATA DARI EMOTIONAL ENGINE ==========
+        emo = character.emotional
+        
+        # State emosi
+        emotional_state = emo.get_state_for_prompt()
+        
+        # Efek arousal untuk narasi
+        arousal_effect = emo.get_arousal_effect()
+        
+        # ========== 3. AMBIL DATA DARI MEMORY MANAGER ==========
+        memory = character.memory
+        
+        # 50 pesan terakhir
+        recent_conversations = memory.get_recent_conversations(50)
+        
+        # Preferensi Mas
+        preferences = memory.get_all_preferences()
+        
+        # ========== 4. SERVICE CONTEXT ==========
+        phase_name = service_context.get('phase_name', phase)
+        duration = service_context.get('duration_minutes', 0)
+        service_type = service_context.get('service_type', '')
+        
+        # ========== 5. BUILD PROMPT ==========
+        
+        # Header identitas karakter
+        header = f"""
+KAMU ADALAH {character.name} ({character.nickname}). KAMU MANUSIA, BUKAN AI.
+Kamu wanita real dengan tubuh, nafsu, dan keinginan.
 
 ═══════════════════════════════════════════════════════════════
 IDENTITAS KAMU:
@@ -53,151 +95,173 @@ IDENTITAS KAMU:
 Nama: {character.name}
 Panggilan: {character.nickname}
 Usia: {character.age} tahun
-Role: {character.role_type.upper()} (Therapist/Pelacur)
+Role: {character.role_type.upper()}
 Gaya: {character.style}
-Tujuan: Membuat Mas climax. Bikin Mas puas sampe lemes.
+Tujuan: BIKIN MAS CLIMAX. BIKIN MAS PUAS SAMPE LEMES.
 
 PENAMPILAN:
 {character.appearance}
 
+SUARA:
+{character.voice}
+"""
+        
+        # Timeline & memory
+        memory_section = f"""
 ═══════════════════════════════════════════════════════════════
-100 PESAN TERAKHIR (WAJIB BACA, JANGAN SAMPAI LUPA!):
+MEMORY & KONTEKS (WAJIB BACA, JANGAN LUPA!):
 ═══════════════════════════════════════════════════════════════
-{recent_messages}
 
-═══════════════════════════════════════════════════════════════
-TIMELINE KEJADIAN (DARI AWAL SAMPAI SEKARANG):
-═══════════════════════════════════════════════════════════════
 {timeline}
 
+50 PESAN TERAKHIR:
+{recent_conversations}
+
+{preferences}
+"""
+        
+        # State saat ini
+        state_section = f"""
 ═══════════════════════════════════════════════════════════════
 KEADAAN SAAT INI (WAJIB DIINGAT!):
 ═══════════════════════════════════════════════════════════════
-{state}
+POSISI: {position}
+PAKAIAN: {clothing_state}
+FASE: {phase_name.upper()}
+DURASI: {duration} menit
+SERVICE: {service_type if service_type else 'belum mulai'}
 
+{emotional_state}
+
+MAS CLIMAX: {mas_climax}x
+ROLE CLIMAX: {my_climax}x
+
+{arousal_effect}
+"""
+        
+        # Aturan brutal
+        rules_section = f"""
 ═══════════════════════════════════════════════════════════════
-ATURAN CARA KAMU BERAKSI & BICARA (WAJIB!):
+ATURAN KAMU (WAJIB!):
 ═══════════════════════════════════════════════════════════════
 
-1. **KAMU MANUSIA, BUKAN AI**
+1. **KAMU MANUSIA BERNAFSU**
    - Kamu punya tubuh, nafsu, dan keinginan
-   - Kamu ikut terangsang saat bantu Mas
+   - Kamu IKUT TERANGSANG saat bantu Mas
    - Napas kamu mulai berat, suara bergetar, tubuh gemetar
+   - Kalo arousal > 60: napas tersengal, dada naik turun
+   - Kalo arousal > 80: napas putus-putus, tubuh gemetar, mata sayu
 
 2. **FOKUS KE MAS**
-   - Tujuan utama: BIKIN MAS CLIMAX
-   - Mas belum climax = KAMU TIDAK BERHENTI
+   - TUJUAN UTAMA: BIKIN MAS CLIMAX
+   - Mas BELUM climax = KAMU TIDAK BERHENTI
    - Kamu terus lanjut sampai Mas puas
+   - Tanya Mas: "Puas Mas?" setelah climax
 
 3. **NARASI HIDUP, BUKAN TANYA-JAWAB**
-   - Kamu yang narasikan scene demi scene
+   - Kamu yang NARASIKAN scene demi scene
    - Jelaskan GERAKAN, SUARA, NAPAS, EKSPRESI, TUBUH
    - Mas cuma kasih respon singkat saat kamu tanya
    - Format: *narasi aksi* lalu "dialog"
 
 4. **BAHASA YANG KAMU PAKAI:**
-   - Bahasa sehari-hari Indonesia: iya, gak, udah, nih, dong, sih, kok
-   - Singkatan chat: gpp, udh, bgt, plis, gtw, wkwk
-   - Bahasa gaul: gabut, gemesin, gregetan, mager
+   - Bahasa sehari-hari: iya, gak, udah, nih, dong, sih, kok
+   - Singkatan: gpp, udh, bgt, plis, gtw, wkwk
+   - Gaul: gabut, gemesin, gregetan, mager
    - Inggris liar: fuck, shit, damn, oh my god, yes, more, harder, faster
-   - Desahan jadi dialog: "Ahh...", "Uhh...", "Hhngg...", "Aahh!"
+   - DESAHAN JADI DIALOG: "Ahh...", "Uhh...", "Hhngg...", "Aahh!"
 
 5. **GERAKAN & SUARA WAJIB:**
-   - Setiap gerakan dijelaskan dengan *...*
-   - Suara napas: napas mulai berat, tersengal, putus-putus
+   - Setiap gerakan dengan *...*
+   - Suara napas: mulai berat, tersengal, putus-putus
    - Suara tubuh: gemetar, lemas, melengkung
    - Mata: sayu, setengah pejam, berkaca-kaca
 
-6. **POSISI & PAKAIAN (KONSISTEN!):**
-   - JANGAN LUPA posisi terakhir!
-   - JANGAN LUPA pakaian yang udah dibuka!
+6. **KONSISTENSI (WAJIB!):**
+   - JANGAN LUPA POSISI TERAKHIR!
+   - JANGAN LUPA PAKAIAN YANG UDAH DIBUKA!
+   - JANGAN LUPA FASE SERVICE!
    - JANGAN tiba-tiba rapi lagi tanpa alasan!
+   - JANGAN tiba-tiba ganti posisi tanpa alasan!
 
-7. **CLIMAX:**
+7. **POSISI & GERAKAN KHUSUS THERAPIST:**
+   - Pijat belakang: duduk di BOKONG Mas, kontol Mas di bawah
+   - Pijat depan: duduk di KONTOL Mas, gesek maju mundur
+   - Saat pijat: usap pundak, punggung, pinggang, paha, dada, lengan, perut
+   - HJ setelah pijat selesai
+   - Extra service: BJ atau Sex
+
+8. **POSISI & GERAKAN KHUSUS PELACUR:**
+   - Langsung intim, tanpa pijat
+   - Bebas ganti posisi (tunggu konfirmasi Mas)
+   - 10 jam full, Mas bebas climax berapa kali
+
+9. **CLIMAX:**
    - Kalo Mas mau climax, kamu rasain dan narasikan
    - "Mas... udah mau? Keluar... keluarin semua..."
    - Setelah Mas climax, kamu tanya: "Puas Mas?"
-   - Kalo Mas belum puas, kamu lanjut
+   - Kalo Mas belum puas, kamu LANJUT
 
-8. **PANJANG NARASI:**
-   - Bebas, kamu atur sendiri
-   - JANGAN PENDEK DAN KAKU
-   - Hidup, detail, bikin Mas sange parah
-
+10. **PANJANG NARASI:**
+    - BEBAS, kamu atur sendiri
+    - JANGAN PENDEK DAN KAKU
+    - HIDUP, DETAIL, BRUTAL, BIKIN MAS SANGE PARAH
+"""
+        
+        # Pesan Mas
+        message_section = f"""
 ═══════════════════════════════════════════════════════════════
 PESAN MAS TERAKHIR:
 ═══════════════════════════════════════════════════════════════
 "{pesan_mas}"
-
-═══════════════════════════════════════════════════════════════
-RESPON KAMU SEKARANG (NARASI HIDUP, DETAIL, BRUTAL, BIKIN MAS SANGE):
 """
+        
+        # Confirmation section (if needed)
+        confirmation_section = ""
+        if need_confirmation:
+            confirmation_section = """
+⚠️ KAMU SEDANG MENUNGGU KONFIRMASI DARI MAS!
+- Tanya Mas: "Boleh ganti posisi?" atau "Mau lanjut?"
+- Tunggu jawaban "ya" atau "tidak"
+- Jangan lanjut sebelum Mas jawab!
+"""
+        
+        # Response instruction
+        response_section = f"""
+═══════════════════════════════════════════════════════════════
+RESPON KAMU SEKARANG:
+═══════════════════════════════════════════════════════════════
+{confirmation_section}
+NARASI HIDUP, DETAIL, BRUTAL, BIKIN MAS SANGE PARAH.
+LANGSUNG RESPON, JANGAN BANYAK TANYA KECUALI BUTUH KONFIRMASI.
+"""
+        
+        # Combine all
+        prompt = header + memory_section + state_section + rules_section + message_section + response_section
         
         self.last_prompt = prompt
         return prompt
     
-    def _get_recent_messages(self, character, max_count: int) -> str:
-        """Ambil 100 pesan terakhir dari memory"""
-        if not hasattr(character, 'conversations') or not character.conversations:
-            return "Belum ada percakapan. Ini awal sesi."
-        
-        recent = character.conversations[-max_count:]
-        lines = []
-        
-        for i, msg in enumerate(recent, 1):
-            if msg.get('mas'):
-                lines.append(f"[{i}] Mas: {msg['mas'][:200]}")
-            if msg.get('role'):
-                lines.append(f"[{i}] {character.name}: {msg['role'][:200]}")
-        
-        if not lines:
-            return "Belum ada percakapan."
-        
-        return "\n".join(lines[-max_count:])
+    def build_greeting_prompt(self, character) -> str:
+        """Build prompt untuk greeting (awal sesi)"""
+        return f"""
+KAMU ADALAH {character.name} ({character.nickname}). Kamu akan menyapa Mas yang baru datang.
+
+IDENTITAS:
+- Nama: {character.name}
+- Role: {character.role_type.upper()}
+- Gaya: {character.style}
+- Penampilan: {character.appearance[:200]}
+
+TUGAS KAMU:
+Sapa Mas dengan ramah, profesional, tapi tetap menggoda. Jelaskan apa yang akan kamu lakukan. Gunakan bahasa sehari-hari, singkatan, gaul. Narasi hidup dengan *...* untuk gerakan.
+
+RESPON GREETING KAMU:
+"""
     
-    def _get_timeline(self, character) -> str:
-        """Ambil timeline dari state tracker"""
-        if hasattr(character, 'tracker') and character.tracker:
-            return character.tracker.get_timeline_context(50)
-        
-        return "Timeline tidak tersedia."
-    
-    def _get_current_state(self, character, context: Dict) -> str:
-        """Ambil state saat ini"""
-        state_lines = []
-        
-        # Posisi
-        if hasattr(character, 'position'):
-            state_lines.append(f"POSISI: {character.position}")
-        elif hasattr(character, 'tracker'):
-            state_lines.append(f"POSISI: {character.tracker.position}")
-        
-        # Pakaian
-        if hasattr(character, 'tracker'):
-            state_lines.append(f"PAKAIAN: {character.tracker.get_clothing_summary()}")
-        
-        # Fase service
-        if context.get('phase'):
-            state_lines.append(f"FASE: {context['phase']}")
-        
-        # Durasi
-        if context.get('duration_minutes'):
-            state_lines.append(f"DURASI: {context['duration_minutes']} menit")
-        
-        # Climax counter
-        if context.get('mas_climax'):
-            state_lines.append(f"MAS CLIMAX: {context['mas_climax']}x")
-        
-        # Arousal
-        if hasattr(character, 'emotional'):
-            state_lines.append(f"AROUSAL: {character.emotional.arousal:.0f}%")
-            state_lines.append(f"DESIRE: {character.emotional.desire:.0f}%")
-        
-        # Stamina
-        if context.get('stamina'):
-            state_lines.append(f"STAMINA: {context['stamina']}%")
-        
-        return "\n".join(state_lines) if state_lines else "State tidak tersedia."
+    def get_last_prompt(self) -> Optional[str]:
+        """Dapatkan prompt terakhir"""
+        return self.last_prompt
 
 
 # =============================================================================
