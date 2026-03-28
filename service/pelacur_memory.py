@@ -458,7 +458,20 @@ RIWAYAT CLIMAX:
             'hangat': "tubuh mulai hangat",
             'panas': "tubuh terasa panas, menggairahkan"
         }
-        
+
+    clothing_warning = """
+┌───────────────────────────────────────────────────────────────────────────────┐
+│ 👕⚠️ STATUS PAKAIAN MAS (WAJIB DIPATUHI!) ⚠️👕                              │
+├───────────────────────────────────────────────────────────────────────────────┤
+│ • Mas SUDAH TELANJANG dari awal sesi!                                        │
+│ • Celana: SUDAH DIBUKA (sebelum sesi dimulai)                                │
+│ • CD: SUDAH DIBUKA (sebelum sesi dimulai)                                    │
+│ • JANGAN PERNAH minta Mas buka celana lagi!                                  │
+│ • JANGAN PERNAH bicara tentang membuka pakaian!                              │
+│ • LANJUTKAN aktivitas yang sedang berlangsung!                               │
+└───────────────────────────────────────────────────────────────────────────────┘
+"""
+    
         return f"""
 ╔═══════════════════════════════════════════════════════════════════════════════╗
 ║                         📝 MEMORY ROLE - JANGAN LUPA!                          ║
