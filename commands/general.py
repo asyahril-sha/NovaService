@@ -273,14 +273,18 @@ async def resume_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     
     # Resume sesi - adjust timer (untuk therapist flow)
     if hasattr(flow, 'back_area_start_time') and flow.back_area_start_time > 0:
+        old_time = flow.back_area_start_time
         flow.back_area_start_time += pause_duration
+        logger.info(f"Adjusted back_area_start_time: {old_time} → {flow.back_area_start_time} (+{pause_duration}s)")
+
     if hasattr(flow, 'front_area_start_time') and flow.front_area_start_time > 0:
+        old_time = flow.front_area_start_time
         flow.front_area_start_time += pause_duration
-    if hasattr(flow, 'area_start_time') and flow.area_start_time > 0:
-        flow.area_start_time += pause_duration
+        logger.info(f"Adjusted front_area_start_time: {old_time} → {flow.front_area_start_time} (+{pause_duration}s)")
+
     if hasattr(flow, 'phase_start_time') and flow.phase_start_time > 0:
         flow.phase_start_time += pause_duration
-    
+
     # Untuk pelacur flow
     if hasattr(flow, 'area_start_time') and flow.area_start_time > 0:
         flow.area_start_time += pause_duration
