@@ -92,6 +92,8 @@ class TherapistFlow:
         # Set posisi
         self.character.tracker.position = "duduk di atas bokong Mas"
         self.character.tracker.service_phase = ServicePhase.REFLEX_BACK
+
+        logger.info(f"Starting back massage, phase: {self.current_phase}")
         
         return self.scene_builder.build_reflex_back_start_scene()
     
@@ -536,6 +538,8 @@ class TherapistFlow:
         
         # Update state dari pesan
         self.character.update_from_message(pesan_mas)
+
+        logger.info(f"Current phase: {self.current_phase}")
         
         # ========== PHASE: GREETING ==========
         if self.current_phase == ServicePhase.GREETING:
