@@ -1,7 +1,7 @@
 # commands/role.py
 """
 Role Commands NovaService
-/role therapist, /role pelacur
+/role therapist, /role pelacur, /statusrole, /batal
 """
 
 import logging
@@ -10,7 +10,7 @@ from telegram import Update
 from telegram.ext import ContextTypes, CommandHandler
 
 from config import get_settings
-from utils.user_mode import set_user_mode
+from utils.user_mode import set_user_mode, get_user_mode, get_active_role
 from service.therapist_flow import TherapistFlow
 from service.pelacur_flow import PelacurFlow
 
@@ -56,6 +56,9 @@ async def role_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     
     role_type = args[0].lower()
     
+    # Bersihkan role lama jika ada
+    await _clear_user_role(user_id)
+    
     if role_type == "therapist":
         selected = random.choice(THERAPIST_CHARACTERS)
         await _activate_therapist(user_id, selected, update)
@@ -67,6 +70,28 @@ async def role_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
             f"Role '{role_type}' gak ada. Pilih: therapist atau pelacur",
             parse_mode='Markdown'
         )
+
+
+async def _clear_user_role(user_id: int):
+    """Bersihkan role lama user"""
+    global _user_roles, _user_flows
+    
+    # Hentikan auto-send jika ada
+    try:
+        from handlers.message import _stop_auto_send
+        await _stop_auto_send(user_id)
+    except ImportError:
+        pass
+    
+    if user_id in _user_roles:
+        del _user_roles[user_id]
+    if user_id in _user_flows:
+        del _user_flows[user_id]
+    
+    # Reset user mode
+    await set_user_mode(user_id, 'chat', None)
+    
+    logger.info(f"🧹 Cleared role for user {user_id}")
 
 
 async def _activate_therapist(user_id: int, character_key: str, update: Update):
@@ -113,7 +138,7 @@ async def _activate_therapist(user_id: int, character_key: str, update: Update):
         # Start session via flow
         greeting = await _user_flows[user_id].start()
         
-        logger.info(f"Session started for {character.name}")
+        logger.info(f"✅ Therapist activated: {character.name} for user {user_id}")
         await update.message.reply_text(greeting, parse_mode='Markdown')
         
     except Exception as e:
@@ -170,7 +195,7 @@ async def _activate_pelacur(user_id: int, character_key: str, update: Update):
             duration_hours=character.booking_duration
         )
         
-        logger.info(f"Session started for {character.name}")
+        logger.info(f"✅ Pelacur activated: {character.name} for user {user_id}")
         await update.message.reply_text(greeting, parse_mode='Markdown')
         
     except Exception as e:
@@ -186,19 +211,49 @@ async def statusrole_command(update: Update, context: ContextTypes.DEFAULT_TYPE)
     if user_id != settings.admin_id:
         return
     
+    mode = await get_user_mode(user_id)
+    active_role = await get_active_role(user_id)
+    
+    if mode != 'role' or not active_role:
+        await update.message.reply_text(
+            "💜 Tidak ada role yang aktif.\n\n"
+            "Gunakan `/role therapist` atau `/role pelacur` untuk mulai, Mas.",
+            parse_mode='Markdown'
+        )
+        return
+    
     role = _user_roles.get(user_id)
     if role:
         status_text = role.get_status()
         await update.message.reply_text(status_text, parse_mode='Markdown')
     else:
         await update.message.reply_text(
-            "💜 Tidak ada role yang aktif.\n\n"
-            "Gunakan `/role therapist` atau `/role pelacur` untuk mulai, Mas.",
+            "Role tidak ditemukan. Silakan pilih role lagi, Mas.",
             parse_mode='Markdown'
         )
 
 
+async def batal_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Handler /batal - Kembali ke mode chat dan bersihkan role"""
+    user_id = update.effective_user.id
+    settings = get_settings()
+    
+    if user_id != settings.admin_id:
+        return
+    
+    # Bersihkan role
+    await _clear_user_role(user_id)
+    
+    await update.message.reply_text(
+        "💜 *KEMBALI KE NOVA* 💜\n\n"
+        "Nova di sini, Mas. Ada yang bisa dibantu?",
+        parse_mode='Markdown'
+    )
+
+
 def register_role_commands(app):
-    """Register role commands"""
+    """Register semua role commands"""
     app.add_handler(CommandHandler("role", role_command))
     app.add_handler(CommandHandler("statusrole", statusrole_command))
+    app.add_handler(CommandHandler("batal", batal_command))
+    logger.info("✅ Role commands registered: /role, /statusrole, /batal")
