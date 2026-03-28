@@ -28,11 +28,18 @@ class PelacurMemory:
         self.character_name = character_name
 
         # ========== CLOTHING STATE ==========
-    self.mas_clothing = {
-        'celana': 'sudah dibuka',      # 'masih pakai', 'sudah dibuka'
-        'cd': 'sudah dibuka',           # 'masih pakai', 'sudah dibuka'
-        'baju': 'sudah dibuka',          # 'masih pakai', 'sudah dibuka'
-}
+        self.mas_clothing = {
+            'celana': 'sudah dibuka',      # 'masih pakai', 'sudah dibuka'
+            'cd': 'sudah dibuka',           # 'masih pakai', 'sudah dibuka'
+            'baju': 'sudah dibuka',          # 'masih pakai', 'sudah dibuka'
+        }
+        
+        # ========== CLIMAX COUNTER ==========
+        self.cum_count = 0           # Mas climax counter
+        self.role_climax_count = 0   # Role climax counter
+        self.cum_locations = []      # Lokasi climax
+        self.last_cum_time = 0       # Waktu climax terakhir
+    
         # ========== POSITION MEMORY ==========
         self.last_position: Optional[str] = None
         self.position_history: List[Dict] = []  # [{position, time, phase}]
@@ -69,8 +76,8 @@ class PelacurMemory:
         self.last_action_time: float = 0
         
         # ========== CONTINUITY CHECK ==========
-        self.conversation_context: deque = deque(maxlen=20)  # 20 percakapan terakhir
-        self.scene_context: deque = deque(maxlen=10)  # 10 scene terakhir
+        self.conversation_context: deque = deque(maxlen=50)  # 20 percakapan terakhir
+        self.scene_context: deque = deque(maxlen=20)  # 10 scene terakhir
         
         # ========== INTIMATE CUMULATIVE ==========
         self.cum_count: int = 0  # Sudah berapa kali climax
