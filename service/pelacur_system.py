@@ -738,6 +738,12 @@ class PelacurSystem(PelacurAuto, PelacurManual):
         self.is_active = True
         self.current_phase = ServicePhase.GREETING
         self.booking_start_time = time.time()
+
+        # Gunakan duration_hours jika diberikan,否则 pakai default 6 jam
+        if duration_hours is not None:
+        self.TOTAL_BOOKING_HOURS = duration_hours
+        self.TOTAL_BOOKING_SECONDS = duration_hours * 3600
+        
         self.booking_end_time = self.booking_start_time + self.TOTAL_BOOKING_SECONDS
         self.cycle_start_time = self.booking_start_time
         self.current_cycle = 1
