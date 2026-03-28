@@ -212,11 +212,7 @@ DESIRE: {self.character.emotional.desire:.0f}% (pengen bikin Mas climax)
             return "PERUT"
         
         return None
-    
-    # =========================================================================
-    # PHASE PROMPTS (DENGAN PENGINGAT PAKAIAN)
-    # =========================================================================
-    
+
     def _get_phase_prompt(self, phase: str, pesan_mas: str, memory_context: str) -> str:
         """Dapatkan prompt spesifik per fase dengan pengingat pakaian"""
         
@@ -231,12 +227,6 @@ DESIRE: {self.character.emotional.desire:.0f}% (pengen bikin Mas climax)
 │  FOKUS pada aktivitas yang sedang berlangsung!                                │
 │                                                                               │
 └───────────────────────────────────────────────────────────────────────────────┘
-"""
-
-        clothing_warning = """
-⚠️⚠️⚠️ PERINGATAN WAJIB ⚠️⚠️⚠️
-Mas SUDAH TELANJANG! Celana sudah dibuka dari awal sesi.
-JANGAN PERNAH minta Mas buka celana! LANJUTKAN aktivitas yang sedang berlangsung!
 """
     
         phase_prompts = {
