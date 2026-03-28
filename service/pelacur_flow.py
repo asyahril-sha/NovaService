@@ -105,6 +105,10 @@ class PelacurFlow:
         
         # ========== AUTO SEND ==========
         self.auto_send_active = False
+
+        # ========== PAUSE & RESUME ==========
+        self.is_paused = False
+        self.pause_start_time = 0
         
         logger.info(f"🔥 PelacurFlow initialized for {character.name}")
     
