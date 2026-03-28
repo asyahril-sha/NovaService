@@ -506,6 +506,5 @@ DESKRIPSIKAN:
 
 RESPON:
 """
-        }
-        
+
         return f"*{self.character.name} terus melayani Mas dengan penuh cinta*"
