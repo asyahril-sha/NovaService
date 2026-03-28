@@ -200,7 +200,6 @@ class TherapistFlow:
     def _should_send_next_scene(self) -> bool:
         """Cek apakah sudah waktunya kirim scene berikutnya"""
         elapsed = self._get_area_elapsed()
-        expected_scene = elapsed // self.SCENE_INTERVAL
 
         # Untuk sex pakai interval 15 detik
         if self.current_phase == ServicePhase.SEX:
@@ -782,15 +781,15 @@ class TherapistFlow:
         # Kirim pesan balik badan
         balik_badan_msg = f"""*{self.character.name} berhenti memijat, mengusap keringat di dahi*
 
-    "Mas... bagian belakang udah selesai. Sekarang giliran depan ya..."
+"Mas... bagian belakang udah selesai. Sekarang giliran depan ya..."
 
-    *Dia turun dari meja pijat, membantu Mas balik badan*
+*Dia turun dari meja pijat, membantu Mas balik badan*
 
-    "Telentang dulu ya Mas... aku pijat bagian depan."
+"Telentang dulu ya Mas... aku pijat bagian depan."
 
-    *{self.character.name} naik lagi, duduk di atas kontol Mas*
+*{self.character.name} naik lagi, duduk di atas kontol Mas*
 
-    "Aku mulai dari dada dulu ya..." """
+"Aku mulai dari dada dulu ya..." """
     
         # Generate scene pertama pijat depan
         front_scene = await self._generate_front_scene(
