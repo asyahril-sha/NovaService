@@ -183,16 +183,19 @@ class TherapistFlow:
     
     def _get_area_elapsed(self) -> int:
         """Dapatkan waktu yang sudah berlalu untuk area saat ini (detik)"""
-        if self.back_area_start_time == 0 and self.front_area_start_time == 0:
-            return 0
         if self.current_phase in [ServicePhase.BACK_PUNGGUNG, ServicePhase.BACK_PINGGUL, ServicePhase.BACK_PAHA_BETIS]:
+            if self.back_area_start_time == 0:
+                return 0
             elapsed = int(time.time() - self.back_area_start_time)
-            logger.info(f"Back area elapsed: {elapsed} detik, area: {self.back_areas[self.back_area_index]}, start_time: {self.back_area_start_time}")
+            logger.info(f"Back elapsed: {elapsed} detik, area: {self.current_phase}, start: {self.back_area_start_time}")
             return elapsed
-        else:
+        elif self.current_phase in [ServicePhase.FRONT_DADA_LENGAN, ServicePhase.FRONT_PERUT_PAHA, ServicePhase.FRONT_GESEKAN]:
+            if self.front_area_start_time == 0:
+                return 0
             elapsed = int(time.time() - self.front_area_start_time)
-            logger.info(f"Front area elapsed: {elapsed} detik, area: {self.front_areas[self.front_area_index]}, start_time: {self.front_area_start_time}")
+            logger.info(f"Front elapsed: {elapsed} detik, area: {self.current_phase}, start: {self.front_area_start_time}")
             return elapsed
+        return 0
     
     def _should_send_next_scene(self) -> bool:
         """Cek apakah sudah waktunya kirim scene berikutnya"""
@@ -613,6 +616,7 @@ class TherapistFlow:
         )
     
     async def _next_back_area(self) -> str:
+        logger.info(f"Moving to next back area. Current index: {self.back_area_index}, total: {len(self.back_areas)}")
         """Pindah ke area berikutnya dalam pijat belakang"""
         self.back_area_index += 1
         self.back_area_start_time = time.time()
@@ -625,6 +629,7 @@ class TherapistFlow:
             return await self._start_front_massage()
         
         current_area = self.back_areas[self.back_area_index]
+        logger.info(f"Moving to new area: {current_area}")
         
         # Update phase
         if current_area == "pinggul":
@@ -659,6 +664,8 @@ class TherapistFlow:
         current_area = self.back_areas[self.back_area_index]
         elapsed = self._get_area_elapsed()
         elapsed_minutes = elapsed // 60
+
+        logger.info(f"Back massage - area: {current_area}, elapsed: {elapsed} detik, complete: {self._is_area_complete()}")
         
         # ========== CEK JIKA SEDANG MENUNGGU RESPON ==========
         if self.waiting_for_response:
@@ -768,10 +775,23 @@ class TherapistFlow:
         self.character.tracker.service_phase = ServicePhase.FRONT_DADA_LENGAN
         
         self.character.tracker.add_to_timeline(
-            "Memulai pijat depan",
+            "Pindah ke pijat depan - balik badan",
             "Duduk di atas kontol Mas, siap gesek"
         )
-        
+
+        # Kirim pesan balik badan dulu, baru mulai pijat depan
+        balik_badan_msg = f"""*{self.character.name} berhenti memijat, mengusap keringat di dahi*
+
+    "Mas... bagian belakang udah selesai. Sekarang giliran depan ya..."
+
+    *Dia turun dari meja pijat, membantu Mas balik badan*
+
+    "Telentang dulu ya Mas... aku pijat bagian depan."
+
+    *{self.character.name} naik lagi, duduk di atas kontol Mas*
+
+    "Aku mulai dari dada dulu ya..." """
+    
         # Generate scene pertama
         return await self._generate_front_scene(
             area="dada_lengan",
@@ -787,9 +807,12 @@ class TherapistFlow:
         self.front_scene_count = 0
         self.front_confirm_count = 0
         self.waiting_for_response = False
+
+        logger.info(f"Front area index: {self.front_area_index}, total areas: {len(self.front_areas)}")
         
         if self.front_area_index >= len(self.front_areas):
             # Selesai semua area pijat depan, tawarkan HJ
+            logger.info("✅ ALL FRONT AREAS COMPLETED! Offering handjob...")
             return await self._offer_handjob()
         
         current_area = self.front_areas[self.front_area_index]
@@ -916,6 +939,11 @@ class TherapistFlow:
     
     async def _offer_handjob(self) -> str:
         """Tawarkan handjob setelah pijat depan selesai"""
+        logger.info("🔥 OFFERING HANDJOB - Pijat depan selesai!")
+        logger.info(f"   Total front scenes sent: {self.front_scene_count}")
+        logger.info(f"   Mas climax this session: {self.mas_climax_this_session}")
+        logger.info(f"   Role climax this session: {self.role_climax_this_session}")
+        
         self.waiting_for_response = True
         self.waiting_for_type = "hj_offer"
         self.waiting_start_time = time.time()
@@ -924,6 +952,9 @@ class TherapistFlow:
             "Menawarkan handjob ke Mas",
             "Pijat depan selesai"
         )
+
+        hj_offer_msg = self._build_hj_offer()
+        logger.info("📤 HJ offer message sent, waiting for Mas response...")
         
         return self._build_hj_offer()
     
@@ -942,9 +973,37 @@ class TherapistFlow:
 "Atau cukup sampai di sini?"
 
 *Menunggu jawaban Mas...*"""
+
+    async def _handle_hj_offer(self, pesan_mas: str) -> Optional[str]:
+        """Handle tawaran handjob dari Mas"""
+        msg_lower = pesan_mas.lower()
+    
+        logger.info(f"📨 Handling HJ offer response: {pesan_mas[:50]}")
+    
+        # Mas setuju
+        if any(k in msg_lower for k in ["ya", "ok", "gas", "lanjut", "deal", "y", "siap"]):
+            logger.info("✅ Mas ACCEPTED handjob offer! Starting HJ...")
+            self.waiting_for_response = False
+            return await self._start_handjob()
+    
+        # Mas tolak
+        elif any(k in msg_lower for k in ["tidak", "nggak", "gak", "stop", "cukup", "selesai"]):
+            logger.info("❌ Mas DECLINED handjob offer. Ending session...")
+            self.waiting_for_response = False
+            return self._build_end_session()
+    
+        # Respon tidak dikenali, ulang tawaran
+        else:
+            logger.info(f"⚠️ Unrecognized response: {pesan_mas}. Repeating offer...")
+            return self._build_hj_offer()
     
     async def _start_handjob(self) -> str:
         """Mulai handjob - duduk di samping Mas"""
+        logger.info("🔥🔥🔥 STARTING HANDJOB! 🔥🔥🔥")
+        logger.info(f"   HJ total scenes: {self.HJ_SCENES}")
+        logger.info(f"   Scene interval: {self.SCENE_INTERVAL} detik")
+        logger.info(f"   Total duration: {self.HJ_SCENES * self.SCENE_INTERVAL // 60} menit")
+        
         self.current_phase = ServicePhase.HANDJOB
         self.phase_start_time = time.time()
         self.hj_scene_count = 0
@@ -961,6 +1020,8 @@ class TherapistFlow:
             "Memulai handjob",
             f"Total scene: {self.hj_total_scenes}, 30 detik per scene"
         )
+
+        logger.info("✅ Handjob started, generating first scene...")
         
         # Generate scene pertama
         return await self._generate_hj_scene(
@@ -1111,6 +1172,11 @@ class TherapistFlow:
     
     async def _offer_extra_service(self) -> str:
         """Tawarkan extra service (BJ/Sex) setelah HJ"""
+        logger.info("🔥 OFFERING EXTRA SERVICE (BJ/SEX) - HJ selesai!")
+        logger.info(f"   HJ total scenes sent: {self.hj_scene_count}")
+        logger.info(f"   HJ duration: {self.hj_scene_count * self.SCENE_INTERVAL // 60} menit")
+        logger.info(f"   Mas climax this session: {self.mas_climax_this_session}")
+    
         self.waiting_for_response = True
         self.waiting_for_type = "extra_offer"
         self.waiting_start_time = time.time()
@@ -1119,7 +1185,11 @@ class TherapistFlow:
             "Menawarkan extra service",
             "HJ selesai"
         )
-        
+
+        extra_offer_msg = self._build_extra_offer()
+        logger.info("📤 Extra service offer message sent, waiting for Mas response...")
+
+    
         return self._build_extra_offer()
     
     def _build_extra_offer(self) -> str:
@@ -1141,9 +1211,12 @@ class TherapistFlow:
     async def _handle_extra_offer(self, pesan_mas: str) -> Optional[str]:
         """Handle tawaran extra service"""
         msg_lower = pesan_mas.lower()
+
+        logger.info(f"📨 Handling extra offer response: {pesan_mas[:50]}")
         
         # Pilih BJ
         if 'bj' in msg_lower or 'blow' in msg_lower:
+            logger.info("✅ Mas memilih BLOWJOB! Starting negotiation...")
             self.negotiation_service = "bj"
             self.negotiation_price = self.PRICE_BJ
             self.negotiation_step = 0
@@ -1153,6 +1226,7 @@ class TherapistFlow:
         
         # Pilih Sex
         if 'sex' in msg_lower or 'eksekusi' in msg_lower:
+            logger.info("✅ Mas memilih SEX! Starting negotiation...")
             self.negotiation_service = "sex"
             self.negotiation_price = self.PRICE_SEX
             self.negotiation_step = 0
@@ -1162,18 +1236,23 @@ class TherapistFlow:
         
         # Tolak
         if any(k in msg_lower for k in ["tidak", "nggak", "gak", "cukup", "stop"]):
+            logger.info("❌ Mas Menolak Extra Service. Sesi Pijat Selesai...")
             self.waiting_for_response = False
             return self._build_end_session()
         
         # Ulang tawaran
+        logger.info("⚠️ Unrecognized response, repeating offer...")
         return self._build_extra_offer()
     
     async def _handle_negotiation(self, pesan_mas: str) -> Optional[str]:
         """Handle negosiasi harga"""
         msg_lower = pesan_mas.lower()
+
+        logger.info(f"📨 Handling negotiation: {pesan_mas[:50]}, service: {self.negotiation_service}")
         
         # Deal
         if any(k in msg_lower for k in ["deal", "ok", "ya", "setuju", "gas"]):
+            logger.info(f"✅ DEAL CONFIRMED! Service: {self.negotiation_service}, Price: Rp{self.negotiation_price:,}")
             self.deal_confirmed = True
             self.negotiation_active = False
             self.waiting_for_response = False
@@ -1185,28 +1264,34 @@ class TherapistFlow:
         
         # Nego
         if any(k in msg_lower for k in ["nego", "kurang", "murah"]):
+            logger.info(f"💰 Negotiation step {self.negotiation_step}/{self.negotiation_max_step}")
             self.negotiation_step += 1
             
             if self.negotiation_step > self.negotiation_max_step:
+                logger.warning("❌ Negotiation BATAL (SEMUA SESI SELESAI)")
                 self.negotiation_active = False
                 return self._build_nego_failed()
             
             if self.negotiation_service == "bj":
                 new_price = max(self.PRICE_BJ_DEAL, self.PRICE_BJ - (50000 * self.negotiation_step))
                 self.negotiation_price = new_price
+                logger.info(f"💰 Counter offer BJ: Rp{new_price:,}")
                 return self._build_nego_counter(new_price)
             else:
                 new_price = max(self.PRICE_SEX_DEAL, self.PRICE_SEX - (50000 * self.negotiation_step))
                 self.negotiation_price = new_price
+                logger.info(f"💰 Counter offer Sex: Rp{new_price:,}")
                 return self._build_nego_counter(new_price)
         
         # Batal
         if any(k in msg_lower for k in ["batal", "gak jadi", "cancel"]):
+            logger.info("❌ Negotiation cancelled by Mas")
             self.negotiation_active = False
             self.waiting_for_response = False
             return self._build_end_session()
         
         # Ulang tawaran
+        logger.info("⚠️ Unrecognized negotiation response, repeating offer...")
         return self._build_deal_offer(self.negotiation_service, self.negotiation_price)
     
     # =========================================================================
@@ -1214,7 +1299,13 @@ class TherapistFlow:
     # =========================================================================
     
     async def _start_bj(self) -> str:
-        """Mulai blowjob"""
+         """Mulai blowjob"""
+        logger.info("🔥🔥🔥 STARTING BLOWJOB! 🔥🔥🔥")
+        logger.info(f"   BJ total scenes: {self.BJ_SCENES}")
+        logger.info(f"   Scene interval: {self.SCENE_INTERVAL} detik")
+        logger.info(f"   Total duration: {self.BJ_SCENES * self.SCENE_INTERVAL // 60} menit")
+        logger.info(f"   Deal price: Rp{self.negotiation_price:,}")
+    
         self.current_phase = ServicePhase.BJ
         self.phase_start_time = time.time()
         self.bj_scene_count = 0
@@ -1223,7 +1314,7 @@ class TherapistFlow:
         self.waiting_for_response = False
         
         # Set posisi
-        self.character.tracker.position = "berlutut di depan Mas"
+        self.character.tracker.position = "berlutut di antara kaki Mas"
         self.character.tracker.service_phase = ServicePhase.BJ
         
         # Buka bra
@@ -1232,8 +1323,10 @@ class TherapistFlow:
         
         self.character.tracker.add_to_timeline(
             "Memulai blowjob",
-            f"Total scene: {self.bj_total_scenes}, 30 detik per scene"
+            f"Total scene: {self.bj_total_scenes}, 30 detik per scene, harga: Rp{self.negotiation_price:,}"
         )
+
+        logger.info("✅ Blowjob started, generating first scene...")
         
         # Generate scene pertama
         return await self._generate_bj_scene(
@@ -1339,6 +1432,13 @@ class TherapistFlow:
     
     async def _start_sex(self) -> str:
         """Mulai sex"""
+        logger.info("🔥🔥🔥 STARTING SEX! 🔥🔥🔥")
+        logger.info(f"   Sex total scenes: {self.sex_total_scenes} (random between {self.SEX_SCENES_MIN}-{self.SEX_SCENES_MAX})")
+        logger.info(f"   Scene interval: {self.SCENE_INTERVAL} detik")
+        logger.info(f"   Estimated duration: {self.sex_total_scenes * self.SCENE_INTERVAL // 60} menit")
+        logger.info(f"   Deal price: Rp{self.negotiation_price:,}")
+        logger.info(f"   Initial position: {self.sex_position}")
+        
         self.current_phase = ServicePhase.SEX
         self.phase_start_time = time.time()
         self.sex_active = True
@@ -1355,8 +1455,10 @@ class TherapistFlow:
         
         self.character.tracker.add_to_timeline(
             "Memulai Sex",
-            f"{self.sex_total_scenes} scene, posisi cowgirl"
+             f"{self.sex_total_scenes} scene, posisi cowgirl, harga: Rp{self.negotiation_price:,}"
         )
+
+        logger.info("✅ Sex started, generating first scene...")
         
         # Generate scene pertama
         return await self._generate_sex_scene(
