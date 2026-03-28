@@ -13,6 +13,7 @@ from core import ServicePhase
 from service.pelacur_core import PelacurCore
 from service.pelacur_auto import PelacurAuto
 from service.pelacur_manual import PelacurManual
+from service.pelacur_memory import PelacurMemory
 
 logger = logging.getLogger(__name__)
 
