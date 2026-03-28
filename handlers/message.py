@@ -105,29 +105,40 @@ async def _start_auto_send(user_id: int, flow, context: ContextTypes.DEFAULT_TYP
     """Mulai auto-send task untuk mengirim scene otomatis"""
     global _auto_send_tasks
     
-    # Hentikan task lama jika ada
-    await _stop_auto_send(user_id)
-    
-    # Buat task baru
-    task = asyncio.create_task(_auto_send_loop(user_id, flow, context))
-    _auto_send_tasks[user_id] = task
-    logger.info(f"🔄 Auto-send started for user {user_id}")
+    try:
+        # Hentikan task lama jika ada
+        await _stop_auto_send(user_id)
+        
+        # Buat task baru
+        task = asyncio.create_task(_auto_send_loop(user_id, flow, context))
+        _auto_send_tasks[user_id] = task
+        logger.info(f"🔄 Auto-send started for user {user_id}")
+    except Exception as e:
+        logger.error(f"Error starting auto-send for user {user_id}: {e}")
 
 
 async def _stop_auto_send(user_id: int):
     """Hentikan auto-send task untuk user"""
     global _auto_send_tasks
     
-    if user_id in _auto_send_tasks:
-        task = _auto_send_tasks[user_id]
-        if not task.done():
-            task.cancel()
-            try:
-                await task
-            except asyncio.CancelledError:
-                pass
-        del _auto_send_tasks[user_id]
-        logger.info(f"🛑 Auto-send stopped for user {user_id}")
+    # CEK DULU APAKAH USER ID ADA
+    if user_id not in _auto_send_tasks:
+        logger.debug(f"No auto-send task for user {user_id}")
+        return
+    
+    task = _auto_send_tasks[user_id]
+    if not task.done():
+        task.cancel()
+        try:
+            await task
+        except asyncio.CancelledError:
+            pass
+        except Exception as e:
+            logger.error(f"Error cancelling task for user {user_id}: {e}")
+    
+    # HAPUS DENGAN AMAN (pop dengan default None)
+    _auto_send_tasks.pop(user_id, None)
+    logger.info(f"🛑 Auto-send stopped for user {user_id}")
 
 
 async def _auto_send_loop(user_id: int, flow, context: ContextTypes.DEFAULT_TYPE):
@@ -160,6 +171,7 @@ async def _auto_send_loop(user_id: int, flow, context: ContextTypes.DEFAULT_TYPE
     except Exception as e:
         logger.error(f"Auto-send error for user {user_id}: {e}", exc_info=True)
     finally:
-        # Cleanup
+        # Cleanup - HAPUS DENGAN AMAN
         if user_id in _auto_send_tasks:
-            del _auto_send_tasks[user_id]
+            _auto_send_tasks.pop(user_id, None)
+            logger.info(f"🧹 Cleaned up auto-send task for user {user_id}")
