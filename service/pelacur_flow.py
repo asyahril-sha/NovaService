@@ -43,6 +43,7 @@ class PelacurFlow:
     KISSING_DURATION = 1800      # 30 menit
     COWGIRL_DURATION = 3600      # 60 menit
     SCENE_INTERVAL = 30          # 30 detik per scene
+    SEX_SCENE_INTERVAL = 15      # 15 detik per scene khusus sex
     
     # Scene count
     BJ_SCENES = 60               # 30 menit / 30 detik
