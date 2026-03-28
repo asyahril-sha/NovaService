@@ -98,6 +98,7 @@ async def _activate_therapist(user_id: int, character_key: str, update: Update):
         
         # Start session
         greeting = await character.start_session()
+        logger.info(f"Session started for {character.name}, greeting: {greeting[:100]}")
         await update.message.reply_text(greeting, parse_mode='Markdown')
         
     except Exception as e:
