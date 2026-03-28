@@ -9,6 +9,9 @@ import random
 from telegram import Update
 from telegram.ext import ContextTypes, CommandHandler
 
+from service.therapist_flow import TherapistFlow
+from service.pelacur_flow import PelacurFlow
+
 from config import get_settings
 from utils.user_mode import set_user_mode
 
@@ -21,6 +24,7 @@ PELACUR_CHARACTERS = ["davina", "michelle", "jihane", "tissa", "hana", "shindy",
 
 # Dictionary untuk menyimpan role instance per user
 _user_roles = {}
+_user_flows = {}  # ← TAMBAHKAN INI
 
 
 async def role_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -94,10 +98,11 @@ async def _activate_therapist(user_id: int, character_key: str, update: Update):
         
         # Simpan ke memory
         _user_roles[user_id] = character
+        _user_flows[user_id] = TherapistFlow(character)
         await set_user_mode(user_id, 'role', 'therapist')
         
         # Start session
-        greeting = await character.start_session()
+        ggreeting = await _user_flows[user_id].start() 
         logger.info(f"Session started for {character.name}, greeting: {greeting[:100]}")
         await update.message.reply_text(greeting, parse_mode='Markdown')
         
@@ -145,10 +150,15 @@ async def _activate_pelacur(user_id: int, character_key: str, update: Update):
         
         # Simpan ke memory
         _user_roles[user_id] = character
+        _user_flows[user_id] = PelacurFlow(character)
         await set_user_mode(user_id, 'role', 'pelacur')
         
-        # Start session
-        greeting = await character.start_session()
+        # Start session via flow
+        greeting = await _user_flows[user_id].start(
+            location=character.booking_location,
+            price=character.booking_price,
+            duration_hours=character.booking_duration
+        )
         await update.message.reply_text(greeting, parse_mode='Markdown')
         
     except Exception as e:
