@@ -177,13 +177,15 @@ class TherapistFlow:
     # =========================================================================
     
     def _get_area_elapsed(self) -> int:
-        """Dapatkan waktu yang sudah berlalu untuk area saat ini (detik)"""
-        if self.back_area_start_time == 0 and self.front_area_start_time == 0:
-            return 0
         if self.current_phase in [ServicePhase.BACK_PUNGGUNG, ServicePhase.BACK_PINGGUL, ServicePhase.BACK_PAHA_BETIS]:
+            if self.back_area_start_time == 0:
+                return 0
             return int(time.time() - self.back_area_start_time)
-        else:
+        elif self.current_phase in [ServicePhase.FRONT_DADA_LENGAN, ServicePhase.FRONT_PERUT_PAHA, ServicePhase.FRONT_GESEKAN]:
+            if self.front_area_start_time == 0:
+                return 0
             return int(time.time() - self.front_area_start_time)
+        return 0
     
     def _should_send_next_scene(self) -> bool:
         """Cek apakah sudah waktunya kirim scene berikutnya"""
@@ -584,6 +586,8 @@ class TherapistFlow:
     # =========================================================================
     
     async def _process_back_massage(self, pesan_mas: str) -> Optional[str]:
+        current_area = self.back_areas[self.back_area_index]
+        elapsed = self._get_area_elapsed()
         """
         Process pesan Mas dalam fase pijat belakang
         Returns: response atau None jika perlu auto-send scene
