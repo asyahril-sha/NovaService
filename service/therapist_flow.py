@@ -769,37 +769,37 @@ class TherapistFlow:
         self.front_area_index = 0
         self.front_scene_count = 0
         self.front_confirm_count = 0
-        
+    
         # Set posisi
         self.character.tracker.position = "duduk di atas kontol Mas"
         self.character.tracker.service_phase = ServicePhase.FRONT_DADA_LENGAN
-        
+    
         self.character.tracker.add_to_timeline(
             "Pindah ke pijat depan - balik badan",
             "Duduk di atas kontol Mas, siap gesek"
         )
 
-        # Kirim pesan balik badan dulu, baru mulai pijat depan
+        # Kirim pesan balik badan
         balik_badan_msg = f"""*{self.character.name} berhenti memijat, mengusap keringat di dahi*
 
-            "Mas... bagian belakang udah selesai. Sekarang giliran depan ya..."
+    "Mas... bagian belakang udah selesai. Sekarang giliran depan ya..."
 
-            *Dia turun dari meja pijat, membantu Mas balik badan*
+    *Dia turun dari meja pijat, membantu Mas balik badan*
 
-            "Telentang dulu ya Mas... aku pijat bagian depan."
+    "Telentang dulu ya Mas... aku pijat bagian depan."
 
-            *{self.character.name} naik lagi, duduk di atas kontol Mas*
+    *{self.character.name} naik lagi, duduk di atas kontol Mas*
 
-            "Aku mulai dari dada dulu ya..." """
+    "Aku mulai dari dada dulu ya..." """
     
-        # Generate scene pertama
-        return await self._generate_front_scene(
+        # Generate scene pertama pijat depan
+        front_scene = await self._generate_front_scene(
             area="dada_lengan",
             pressure=self._get_current_pressure(),
             scene_num=1,
             elapsed_minutes=0
         )
-
+    
         # KIRIM KEDUANYA
         return balik_badan_msg + "\n\n" + front_scene
     
@@ -958,8 +958,7 @@ class TherapistFlow:
 
         hj_offer_msg = self._build_hj_offer()
         logger.info("📤 HJ offer message sent, waiting for Mas response...")
-        
-        return self._build_hj_offer()
+        return hj_offer_msg
     
     def _build_hj_offer(self) -> str:
         """Bangun pesan tawaran handjob"""
@@ -1183,55 +1182,24 @@ class TherapistFlow:
         self.waiting_for_response = True
         self.waiting_for_type = "extra_offer"
         self.waiting_start_time = time.time()
-        
+    
         self.character.tracker.add_to_timeline(
             "Menawarkan extra service",
             "HJ selesai"
         )
-
+    
         extra_offer_msg = self._build_extra_offer()
         logger.info("📤 Extra service offer message sent, waiting for Mas response...")
-
     
-        return self._build_extra_offer()
-    
-    def _build_extra_offer(self) -> str:
-        """Bangun pesan tawaran extra service"""
-        return f"""*{self.character.name} berhenti, napasnya masih tersengal. Dressnya sudah terbuka, tubuhnya masih hangat.*
+        return extra_offer_msg
 
-"{self.character.panggilan}... mau lanjut ke extra service?"
 
-*Dia menjilat bibir, matanya sayu*
-
-"Ada BJ 30 menit Rp{self.PRICE_BJ:,}, atau sex 50-75 menit Rp{self.PRICE_SEX:,}..."
-
-*Tangannya mulai meraba paha Mas*
-
-"Bisa nego kok Mas... special buat Mas..."
-
-*Menunggu jawaban Mas...*"""
-    
     async def _handle_extra_offer(self, pesan_mas: str) -> Optional[str]:
-        """Tawarkan extra service (BJ/Sex) setelah HJ"""
-        logger.info("🔥 OFFERING EXTRA SERVICE (BJ/SEX) - HJ selesai!")
-        logger.info(f"   HJ total scenes sent: {self.hj_scene_count}")
-        logger.info(f"   HJ duration: {self.hj_scene_count * self.SCENE_INTERVAL // 60} menit")
-        logger.info(f"   Mas climax this session: {self.mas_climax_this_session}")
-        
-        self.waiting_for_response = True
-        self.waiting_for_type = "extra_offer"
-        self.waiting_start_time = time.time()
+        """Handle tawaran extra service dari Mas"""
+        msg_lower = pesan_mas.lower()
     
-        self.character.tracker.add_to_timeline(
-            "Menawarkan extra service",
-            "HJ selesai"
-        )
+        logger.info(f"📨 Handling extra offer response: {pesan_mas[:50]}")
     
-        extra_offer_msg = self._build_extra_offer()
-        logger.info("📤 Extra service offer message sent, waiting for Mas response...")
-    
-        return extra_offer_msg  # ← PAKAI extra_offer_msg
-        
         # Pilih BJ
         if 'bj' in msg_lower or 'blow' in msg_lower:
             logger.info("✅ Mas memilih BLOWJOB! Starting negotiation...")
@@ -1241,7 +1209,7 @@ class TherapistFlow:
             self.negotiation_active = True
             self.waiting_for_type = "negotiation"
             return self._build_deal_offer("bj", self.PRICE_BJ)
-        
+    
         # Pilih Sex
         if 'sex' in msg_lower or 'eksekusi' in msg_lower:
             logger.info("✅ Mas memilih SEX! Starting negotiation...")
@@ -1251,13 +1219,13 @@ class TherapistFlow:
             self.negotiation_active = True
             self.waiting_for_type = "negotiation"
             return self._build_deal_offer("sex", self.PRICE_SEX)
-        
+    
         # Tolak
         if any(k in msg_lower for k in ["tidak", "nggak", "gak", "cukup", "stop"]):
             logger.info("❌ Mas Menolak Extra Service. Sesi Pijat Selesai...")
             self.waiting_for_response = False
             return self._build_end_session()
-        
+    
         # Ulang tawaran
         logger.info("⚠️ Unrecognized response, repeating offer...")
         return self._build_extra_offer()
