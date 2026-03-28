@@ -3,6 +3,7 @@
 Base Character NovaService
 Semua karakter turunan dari class ini
 Punya state tracker, emotional engine, memory manager, prompt builder
+Dilengkapi sistem climax dengan pemberitahuan
 """
 
 import time
@@ -75,6 +76,11 @@ class BaseCharacter:
         # ========== CLIMAX COUNTER ==========
         self.mas_climax_this_session = 0
         self.my_climax_this_session = 0
+        
+        # ========== CLIMAX WARNING SYSTEM ==========
+        self.waiting_climax_confirmation = False
+        self.climax_warning_time = 0
+        self.climax_warning_timeout = 15.0  # detik, kalo gak respon, climax aja
         
         # ========== BOOKING INFO (UNTUK PELACUR) ==========
         self.booking_location = ""
@@ -168,6 +174,90 @@ class BaseCharacter:
             return random.choice(self.moans)
     
     # =========================================================================
+    # CLIMAX WARNING SYSTEM
+    # =========================================================================
+    
+    def _get_climax_warning(self) -> str:
+        """Dapatkan pesan peringatan climax sesuai karakter"""
+        warnings = {
+            "Anya": "*napas Anya mulai tersengal, tangannya gemetar*\n\n\"Mas... aku mau climax... bentar lagi... boleh ikut?\"",
+            "Syifa": "*Syifa menggigit bibir, napasnya putus-putus*\n\n\"Mas... aku udah mau climax... ikut ya?\"",
+            "Laura": "*Laura menarik napas dalam, tubuhnya tegang*\n\n\"Aku mau climax... sekarang.\"",
+            "Tara": "*Tara meremas tangan Mas, tubuhnya gemetar*\n\n\"Mas... aku... mau climax...\"",
+            "Pevita": "*Pevita menahan napas, gerakan mulai tidak stabil*\n\n\"Aku mau climax... cepetin ya Mas?\"",
+            "Maudy": "*Maudy mendesah pelan, mata mulai sayu*\n\n\"Mas... aku mau...\"",
+            "Zara": "*Zara memeluk Mas erat, napasnya tersengal*\n\n\"Mas! aku... mau climax!\"",
+            "Angela": "*Angela menggigit bibir, tangan meremas sprei*\n\n\"Mas... aku mau climax...\"",
+            "Davina": "*Davina menatap Mas dengan mata tajam*\n\n\"Aku mau climax. Lihat.\"",
+            "Michelle": "*Michelle menggenggam tangan Mas erat*\n\n\"Mas... aku mau climax... ikut ya?\"",
+            "Jihane": "*Jihane menahan napas, tubuhnya gemetar hebat*\n\n\"Aku climax... sekarang juga.\"",
+            "Tissa": "*Tissa memejamkan mata, tubuh gemetar*\n\n\"Mas... ajarin... aku mau climax...\"",
+            "Hana": "*Hana menghentikan gerakan, menatap Mas*\n\n\"Aku mau climax. Mas cepetin?\"",
+            "Shindy": "*Shindy mendekat ke telinga Mas, napasnya panas*\n\n\"Mas... aku mau climax... bentar lagi...\"",
+            "Nadya": "*Nadya memeluk Mas erat, tubuhnya gemetar kecil*\n\n\"Mas... aku... udah mau...\"",
+            "Alyssa": "*Alyssa menahan napas, tubuhnya tegang*\n\n\"Aku climax! Sekarang!\""
+        }
+        return warnings.get(self.name, "*napas mulai berat, tubuh gemetar*\n\n\"Aku mau climax...\"")
+    
+    def check_and_notify_climax(self) -> Optional[str]:
+        """
+        Cek apakah role mau climax.
+        Kalo iya, kasih tau Mas dulu.
+        Returns: pesan notifikasi atau None
+        """
+        # Cek arousal (>= 85) dan belum dalam mode waiting
+        if self.emotional.arousal >= 85 and not self.waiting_climax_confirmation:
+            self.waiting_climax_confirmation = True
+            self.climax_warning_time = time.time()
+            
+            # Kasih tau Mas
+            warning = self._get_climax_warning()
+            self.tracker.add_message_to_timeline(self.name, warning[:100])
+            return warning
+        
+        # Kalo udah waiting tapi timeout (gak respon), climax aja
+        if self.waiting_climax_confirmation:
+            if time.time() - self.climax_warning_time > self.climax_warning_timeout:
+                self.waiting_climax_confirmation = False
+                return None  # Biar process_message yang handle climax
+        
+        return None
+    
+    def confirm_climax(self, mas_response: str = "") -> Dict:
+        """
+        Konfirmasi climax setelah Mas respon
+        - Kalo Mas bilang "cepetin" / "kenceng" → climax cepat
+        - Kalo Mas bilang "tahan" / "jangan" → tahan dulu
+        - Kalo Mas diam / respon lain → climax normal
+        """
+        msg_lower = mas_response.lower()
+        
+        # Reset flag
+        self.waiting_climax_confirmation = False
+        
+        # Cek respon Mas
+        if any(k in msg_lower for k in ['cepet', 'kenceng', 'harder', 'faster', 'gas', 'ayo']):
+            # Climax cepat
+            result = self.record_my_climax(intensity="heavy")
+            result['status'] = 'fast_climax'
+            return result
+        
+        elif any(k in msg_lower for k in ['tahan', 'jangan', 'wait', 'stop', 'nunggu']):
+            # Tahan climax
+            self.emotional.arousal = max(0, self.emotional.arousal - 20)
+            self.tracker.add_to_timeline("Menahan climax", "Karena Mas minta tahan")
+            return {
+                'status': 'delayed',
+                'message': f"*{self.name} menahan napas, tubuh masih gemetar*\n\n\"Aku tahan... cepet ya Mas...\""
+            }
+        
+        else:
+            # Climax normal
+            result = self.record_my_climax(intensity="normal")
+            result['status'] = 'normal_climax'
+            return result
+    
+    # =========================================================================
     # UPDATE FROM MESSAGE
     # =========================================================================
     
@@ -210,7 +300,7 @@ class BaseCharacter:
         return changes
     
     # =========================================================================
-    # SERVICE FLOW METHODS (OVERRIDE DI SUBCLASS)
+    # SERVICE FLOW METHODS
     # =========================================================================
     
     async def start_session(self) -> str:
@@ -222,6 +312,7 @@ class BaseCharacter:
         # Reset session counters
         self.mas_climax_this_session = 0
         self.my_climax_this_session = 0
+        self.waiting_climax_confirmation = False
         
         greeting = self.get_greeting()
         self.memory.add_conversation("", greeting)
@@ -230,7 +321,7 @@ class BaseCharacter:
         return greeting
     
     async def process_message(self, pesan_mas: str) -> str:
-        """Proses pesan Mas - override di subclass"""
+        """Proses pesan Mas - akan di-override di subclass"""
         # Update state dari pesan
         changes = self.update_from_message(pesan_mas)
         
@@ -241,14 +332,53 @@ class BaseCharacter:
                 self.pending_action = None
                 return "*waktu habis*"
         
+        # Cek climax warning (kalo role mau climax)
+        climax_warning = self.check_and_notify_climax()
+        if climax_warning:
+            return climax_warning
+        
         # Default response (akan di-override subclass)
-        return f"*{self.name} tersenyum*\n\n\"{self.panggilan}... ada yang bisa dibantu?\""
+        return f"*{self.name} tersenyum*\n\n\"{self.panggilan}... ada yang bisa dibantuan?\""
+    
+    async def process_climax_response(self, pesan_mas: str) -> str:
+        """Proses respon Mas setelah climax warning"""
+        result = self.confirm_climax(pesan_mas)
+        
+        if result.get('status') == 'delayed':
+            return result.get('message', "*menahan napas*")
+        elif result.get('status') == 'fast_climax':
+            return self._get_climax_response(intensity="heavy")
+        else:
+            return self._get_climax_response(intensity="normal")
+    
+    def _get_climax_response(self, intensity: str = "normal") -> str:
+        """Dapatkan respons climax sesuai karakter"""
+        climax_responses = {
+            "Anya": f"*Anya memeluk Mas erat, tubuhnya gemetar*\n\n\"Ahh... {self.panggilan}... climax... uhh...\"",
+            "Syifa": f"*Syifa teriak, tubuh melengkung*\n\n\"Ahhh!! {self.panggilan}!! climax... lemes...\"",
+            "Laura": f"*Laura menahan napas, lalu melepaskannya*\n\n\"Ahh... puas.\"",
+            "Tara": f"*Tara meremas tangan Mas, tubuh gemetar*\n\n\"Mas... aku... climax...\"",
+            "Pevita": f"*Pevita mendesah dalam, tubuhnya rileks*\n\n\"Ahh... selesai.\"",
+            "Maudy": f"*Maudy memejamkan mata, napas panjang*\n\n\"Hmm... makasih Mas...\"",
+            "Zara": f"*Zara memeluk Mas, napas putus-putus*\n\n\"Ahhh! Mas! climax! uhh...\"",
+            "Angela": f"*Angela menggigit bibir, tubuh gemetar*\n\n\"Ahh... Mas... puas...\"",
+            "Davina": f"*Davina mendesah keras, tubuh melengkung*\n\n\"Ahh... puas. Bagus.\"",
+            "Michelle": f"*Michelle memeluk Mas, mata berkaca*\n\n\"Mas... makasih... aku climax...\"",
+            "Jihane": f"*Jihane memeluk Mas erat, napas panjang*\n\n\"Ahh... puas. Besok lagi.\"",
+            "Tissa": f"*Tissa memejamkan mata, tubuh gemetar*\n\n\"Ahhh... Mas... ajarin lagi...\"",
+            "Hana": f"*Hana menghela napas panjang*\n\n\"Ahh... puas. Mas gimana?\"",
+            "Shindy": f"*Shindy memeluk Mas, napasnya panas di telinga*\n\n\"Ahh... Mas... makasih...\"",
+            "Nadya": f"*Nadya memeluk Mas, tubuhnya gemetar kecil*\n\n\"Mas... aku... climax... lemes...\"",
+            "Alyssa": f"*Alyssa mendesah brutal, tubuh tegang lalu lemas*\n\n\"Ahh! climax! puas!\""
+        }
+        return climax_responses.get(self.name, f"*{self.name} gemetar, napas putus-putus*\n\n\"Ahh... climax...\"")
     
     def end_session(self) -> str:
         """Akhiri sesi"""
         duration = int((time.time() - self.session_start_time) / 60) if self.session_start_time else 0
         
         self.is_active = False
+        self.waiting_climax_confirmation = False
         self.tracker.set_phase(ServicePhase.COMPLETED)
         
         end_msg = f"""*{self.name} merapikan dress, tersenyum puas*
@@ -288,6 +418,9 @@ class BaseCharacter:
         
         # Update emotional
         self.emotional.climax(intensity == "heavy")
+        
+        # Reset climax warning flag
+        self.waiting_climax_confirmation = False
         
         return {
             'total': self.my_climax_this_session,
@@ -339,7 +472,16 @@ class BaseCharacter:
         self.pending_action = f"position_{position}"
         self.confirmation_start_time = time.time()
         self.tracker.position = position
-        return f"*{self.name} menatap {self.panggilan} dengan mata sayu*\n\n\"{self.panggilan}... mau ganti posisi {position}? Boleh?\""
+        
+        position_responses = {
+            "cowgirl": f"*{self.name} menatap {self.panggilan} dengan mata sayu*\n\n\"{self.panggilan}... mau ganti posisi cowgirl? Aku di atas ya...\"",
+            "missionary": f"*{self.name} berbaring, menarik {self.panggilan} ke atas*\n\n\"{self.panggilan}... missionary... ayo...\"",
+            "doggy": f"*{self.name} merangkak, pantat naik*\n\n\"{self.panggilan}... doggy... dari belakang...\"",
+            "spooning": f"*{self.name} miring, menarik {self.panggilan} dari belakang*\n\n\"{self.panggilan}... spooning... peluk aku...\"",
+            "standing": f"*{self.name} berdiri, menempel ke tembok*\n\n\"{self.panggilan}... standing... ayo...\"",
+            "sitting": f"*{self.name} duduk di pangkuan {self.panggilan}*\n\n\"{self.panggilan}... sitting... aku duduk di atas...\""
+        }
+        return position_responses.get(position, f"*{self.name} menatap {self.panggilan}*\n\n\"{self.panggilan}... ganti posisi {position}? Boleh?\"")
     
     def confirm_position_change(self) -> bool:
         """Konfirmasi ganti posisi"""
@@ -373,6 +515,8 @@ class BaseCharacter:
         
         phase_display = phase_names.get(self.tracker.service_phase, "⏳ Menunggu")
         
+        climax_status = "⏳ Menunggu konfirmasi" if self.waiting_climax_confirmation else "✅ Siap"
+        
         return f"""
 ╔══════════════════════════════════════════════════════════════╗
 ║                    👤 {self.name} ({self.nickname})                         ║
@@ -385,6 +529,7 @@ class BaseCharacter:
 ║ 📍 POSISI: {self.tracker.position}
 ║ 🔥 AROUSAL: {self.emotional.arousal:.0f}% | DESIRE: {self.emotional.desire:.0f}%
 ║ 💪 STAMINA: {self.emotional.stamina:.0f}%
+║ 💦 CLIMAX: {climax_status}
 ╠══════════════════════════════════════════════════════════════╣
 ║ 💦 MAS CLIMAX: {self.mas_climax_this_session}x
 ║ 💦 ROLE CLIMAX: {self.my_climax_this_session}x
@@ -416,6 +561,7 @@ class BaseCharacter:
             'session_start_time': self.session_start_time,
             'mas_climax_this_session': self.mas_climax_this_session,
             'my_climax_this_session': self.my_climax_this_session,
+            'waiting_climax_confirmation': self.waiting_climax_confirmation,
             'booking_location': self.booking_location,
             'booking_price': self.booking_price,
             'booking_duration': self.booking_duration,
@@ -434,6 +580,7 @@ class BaseCharacter:
         self.session_start_time = data.get('session_start_time', 0)
         self.mas_climax_this_session = data.get('mas_climax_this_session', 0)
         self.my_climax_this_session = data.get('my_climax_this_session', 0)
+        self.waiting_climax_confirmation = data.get('waiting_climax_confirmation', False)
         self.booking_location = data.get('booking_location', '')
         self.booking_price = data.get('booking_price', 0)
         self.booking_duration = data.get('booking_duration', 0)
