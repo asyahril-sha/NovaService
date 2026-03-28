@@ -1,4 +1,4 @@
-# service/scene_builder.py - PART 1
+# service/scene_builder.py
 """
 Scene Builder NovaService - Membangun narasi hidup yang brutal
 Base class untuk therapist dan pelacur
@@ -158,9 +158,6 @@ class SceneBuilder:
 *Dia turun dari meja pijat, membantu Mas balik badan. Matanya menatap tubuh Mas, terutama kontol yang sudah berdiri tegak.*
 
 "Sekarang telentang ya Mas... aku pijat depan..." """
-
-# service/scene_builder.py - PART 2
-# Lanjutan dari PART 1
 
     # =========================================================================
     # FRONT MASSAGE SCENES (Pijat Depan - Duduk di Kontol)
@@ -333,9 +330,6 @@ class SceneBuilder:
         return f"""*Tangannya bergerak cepat, memompa kontol Mas dengan ritme yang makin kencang. Napasnya putus-putus, tubuhnya mulai gemetar.*
 
 "Mas... *napas tersengal* cepat... mau climax?" """
-
-# service/scene_builder.py - PART 3
-# Lanjutan dari PART 2
 
     # =========================================================================
     # BJ & SEX SCENES
