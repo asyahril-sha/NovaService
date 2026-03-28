@@ -1,19 +1,23 @@
 # characters/base_character.py
 """
-Base Character NovaService - Semua karakter turunan dari class ini
-Punya personality, memory, state tracker, dan service flow
+Base Character NovaService
+Semua karakter turunan dari class ini
+Punya state tracker, emotional engine, memory manager, prompt builder
 """
 
 import time
 import logging
 import asyncio
-from typing import Dict, List, Optional, Any, Tuple
+import random
+from typing import Dict, List, Optional, Any
 from datetime import datetime
-from collections import deque
 
-from core.state_tracker import StateTracker, ServicePhase, PhysicalCondition
-from core.emotional_engine import EmotionalEngine, EmotionalStyle
-from core.relationship import RelationshipManager, RelationshipPhase
+from core import (
+    StateTracker, ServicePhase, PhysicalCondition,
+    EmotionalEngine, EmotionalState,
+    MemoryManager,
+    PromptBuilder, get_prompt_builder
+)
 
 logger = logging.getLogger(__name__)
 
@@ -52,29 +56,21 @@ class BaseCharacter:
         # ========== PANGGILAN KE MAS ==========
         self.panggilan = "Mas"
         
-        # ========== STATE TRACKER ==========
+        # ========== CORE ENGINE ==========
         self.tracker = StateTracker(character_name=name)
+        self.emotional = EmotionalEngine(character_name=name)
+        self.memory = MemoryManager(character_name=name)
+        self.prompt_builder = get_prompt_builder()
         
         # Sync tracker dengan clothing awal
         self.tracker.clothing['dress']['on'] = True
         self.tracker.clothing['dress']['type'] = default_clothing
         self.tracker.clothing['dress']['color'] = self._get_dress_color()
         
-        # ========== EMOTIONAL ENGINE ==========
-        self.emotional = EmotionalEngine()
-        
-        # ========== RELATIONSHIP (LEVEL SYSTEM) ==========
-        self.relationship = RelationshipManager()
-        self.relationship.level = 7  # Start level 7
-        self.relationship.phase = RelationshipPhase.CLOSE
-        
-        # ========== CONVERSATIONS (100 PESAN TERAKHIR) ==========
-        self.conversations: deque = deque(maxlen=100)
-        
         # ========== SERVICE STATE ==========
-        self.service_phase = ServicePhase.WAITING
         self.session_start_time = 0
         self.session_duration = 0
+        self.is_active = False
         
         # ========== CLIMAX COUNTER ==========
         self.mas_climax_this_session = 0
@@ -90,11 +86,14 @@ class BaseCharacter:
         self.negotiation_service = None  # "bj", "sex"
         self.negotiation_price = 0
         self.negotiation_step = 0
+        self.negotiation_max_step = 3
         self.deal_confirmed = False
         
         # ========== PENDING RESPONSES ==========
-        self._pending_response = False
-        self._response_type = None
+        self.waiting_confirmation = False
+        self.pending_action = None
+        self.confirmation_start_time = 0
+        self.confirmation_timeout = 15.0  # detik
         
         logger.info(f"👤 Character {self.name} ({self.nickname}) initialized")
         logger.info(f"   Role: {self.role_type} | Age: {self.age} | Style: {self.style}")
@@ -158,46 +157,15 @@ class BaseCharacter:
     
     def get_moan(self, intensity: str = "medium") -> str:
         """Dapatkan desahan sesuai intensitas"""
+        if not self.moans:
+            return "Ahh..."
+        
         if intensity == "low":
-            return random.choice(self.moans[:3]) if len(self.moans) > 3 else self.moans[0]
+            return random.choice(self.moans[:2]) if len(self.moans) > 2 else self.moans[0]
         elif intensity == "high":
-            return random.choice(self.moans[-3:]) if len(self.moans) > 3 else self.moans[-1]
+            return random.choice(self.moans[-2:]) if len(self.moans) > 2 else self.moans[-1]
         else:
             return random.choice(self.moans)
-    
-    # =========================================================================
-    # MEMORY METHODS
-    # =========================================================================
-    
-    def add_conversation(self, mas_msg: str, role_msg: str = ""):
-        """Tambah percakapan ke memory (max 100)"""
-        self.conversations.append({
-            'timestamp': time.time(),
-            'mas': mas_msg[:500],
-            'role': role_msg[:500]
-        })
-        
-        # Juga tambah ke tracker timeline
-        if mas_msg:
-            self.tracker.add_message_to_timeline("Mas", mas_msg)
-        if role_msg:
-            self.tracker.add_message_to_timeline(self.name, role_msg)
-    
-    def get_recent_conversations(self, count: int = 100) -> str:
-        """Dapatkan percakapan terakhir"""
-        if not self.conversations:
-            return "Belum ada percakapan."
-        
-        recent = list(self.conversations)[-count:]
-        lines = []
-        
-        for i, conv in enumerate(recent, 1):
-            if conv.get('mas'):
-                lines.append(f"[{i}] Mas: {conv['mas']}")
-            if conv.get('role'):
-                lines.append(f"[{i}] {self.name}: {conv['role']}")
-        
-        return "\n".join(lines)
     
     # =========================================================================
     # UPDATE FROM MESSAGE
@@ -208,27 +176,36 @@ class BaseCharacter:
         msg_lower = pesan_mas.lower()
         changes = {}
         
+        # Update tracker
+        self.tracker.last_action = pesan_mas[:100]
+        self.tracker.last_action_timestamp = time.time()
+        
         # Update preferensi Mas
-        if 'cepat' in msg_lower or 'kenceng' in msg_lower:
+        if any(k in msg_lower for k in ['cepat', 'kenceng', 'harder', 'faster']):
             self.tracker.save_mas_preference('preferred_speed', 'fast')
+            self.memory.save_mas_preference('preferred_speed', 'fast')
             changes['speed'] = 'fast'
-        elif 'pelan' in msg_lower:
+        elif any(k in msg_lower for k in ['pelan', 'slow', 'lambat']):
             self.tracker.save_mas_preference('preferred_speed', 'slow')
+            self.memory.save_mas_preference('preferred_speed', 'slow')
             changes['speed'] = 'slow'
         
         # Update arousal dari pesan Mas
-        if any(k in msg_lower for k in ['enak', 'mantap', 'bagus']):
+        if any(k in msg_lower for k in ['enak', 'mantap', 'bagus', 'hebat']):
+            self.emotional.add_stimulation("pujian Mas", 2)
             self.tracker.update_arousal(5)
         
-        if any(k in msg_lower for k in ['sange', 'horny', 'panas']):
+        if any(k in msg_lower for k in ['sange', 'horny', 'panas', 'hot']):
+            self.emotional.add_stimulation("Mas juga sange", 5)
             self.tracker.update_arousal(10)
         
-        # Update stamina kalo Mas minta lebih
-        if any(k in msg_lower for k in ['lebih', 'tambah', 'lagi']):
-            self.tracker.update_stamina(-5)
+        if any(k in msg_lower for k in ['pegang', 'remas', 'sentuh', 'touch']):
+            self.emotional.add_stimulation("Mas pegang", 4)
+            self.tracker.update_arousal(8)
         
         # Simpan ke memory
-        self.add_conversation(pesan_mas, "")
+        self.memory.add_conversation(pesan_mas, "")
+        self.tracker.add_message_to_timeline("Mas", pesan_mas)
         
         return changes
     
@@ -237,31 +214,143 @@ class BaseCharacter:
     # =========================================================================
     
     async def start_session(self) -> str:
-        """Mulai sesi - override di subclass"""
+        """Mulai sesi"""
+        self.is_active = True
         self.session_start_time = time.time()
         self.tracker.set_phase(ServicePhase.GREETING)
-        return self.get_greeting()
+        
+        # Reset session counters
+        self.mas_climax_this_session = 0
+        self.my_climax_this_session = 0
+        
+        greeting = self.get_greeting()
+        self.memory.add_conversation("", greeting)
+        self.tracker.add_message_to_timeline(self.name, greeting)
+        
+        return greeting
     
     async def process_message(self, pesan_mas: str) -> str:
         """Proses pesan Mas - override di subclass"""
-        self.update_from_message(pesan_mas)
+        # Update state dari pesan
+        changes = self.update_from_message(pesan_mas)
         
-        # Default response
+        # Cek confirmation timeout
+        if self.waiting_confirmation:
+            if time.time() - self.confirmation_start_time > self.confirmation_timeout:
+                self.waiting_confirmation = False
+                self.pending_action = None
+                return "*waktu habis*"
+        
+        # Default response (akan di-override subclass)
         return f"*{self.name} tersenyum*\n\n\"{self.panggilan}... ada yang bisa dibantu?\""
     
     def end_session(self) -> str:
         """Akhiri sesi"""
         duration = int((time.time() - self.session_start_time) / 60) if self.session_start_time else 0
         
+        self.is_active = False
         self.tracker.set_phase(ServicePhase.COMPLETED)
         
-        return f"""*{self.name} merapikan dress, tersenyum puas*
+        end_msg = f"""*{self.name} merapikan dress, tersenyum puas*
 
 "Sesi selesai, {self.panggilan}. {duration} menit, {self.mas_climax_this_session}x climax."
 
 *berdiri, mengambil handuk*
 
 "Lain kali kalau mau booking lagi, hubungi aku ya."""
+        
+        self.memory.add_conversation("", end_msg)
+        return end_msg
+    
+    # =========================================================================
+    # CLIMAX METHODS
+    # =========================================================================
+    
+    def record_mas_climax(self, intensity: str = "normal") -> Dict:
+        """Rekam climax Mas"""
+        self.mas_climax_this_session += 1
+        self.tracker.record_mas_climax()
+        self.memory.add_climax_history(True, intensity)
+        
+        # Update emotional
+        self.emotional.add_stimulation("Mas climax", 8)
+        
+        return {
+            'total': self.mas_climax_this_session,
+            'intensity': intensity
+        }
+    
+    def record_my_climax(self, intensity: str = "normal") -> Dict:
+        """Rekam climax role"""
+        self.my_climax_this_session += 1
+        self.tracker.record_my_climax()
+        self.memory.add_climax_history(False, intensity)
+        
+        # Update emotional
+        self.emotional.climax(intensity == "heavy")
+        
+        return {
+            'total': self.my_climax_this_session,
+            'intensity': intensity,
+            'stamina_left': self.emotional.stamina
+        }
+    
+    # =========================================================================
+    # NEGOSIATION METHODS
+    # =========================================================================
+    
+    def start_negotiation(self, service: str, price: int):
+        """Mulai negosiasi"""
+        self.negotiation_active = True
+        self.negotiation_service = service
+        self.negotiation_price = price
+        self.negotiation_step = 0
+    
+    def counter_offer(self, offered_price: int) -> bool:
+        """Counter offer dari Mas"""
+        self.negotiation_step += 1
+        
+        if self.negotiation_step > self.negotiation_max_step:
+            self.negotiation_active = False
+            return False
+        
+        # Turunkan harga
+        discount = 50000 * self.negotiation_step
+        new_price = max(self.negotiation_price - discount, 200000)
+        self.negotiation_price = new_price
+        return True
+    
+    def confirm_deal(self) -> bool:
+        """Konfirmasi deal"""
+        if self.negotiation_active:
+            self.deal_confirmed = True
+            self.negotiation_active = False
+            self.memory.add_deal(self.negotiation_service, self.negotiation_price)
+            return True
+        return False
+    
+    # =========================================================================
+    # POSITION METHODS
+    # =========================================================================
+    
+    def request_position_change(self, position: str) -> str:
+        """Minta ganti posisi"""
+        self.waiting_confirmation = True
+        self.pending_action = f"position_{position}"
+        self.confirmation_start_time = time.time()
+        self.tracker.position = position
+        return f"*{self.name} menatap {self.panggilan} dengan mata sayu*\n\n\"{self.panggilan}... mau ganti posisi {position}? Boleh?\""
+    
+    def confirm_position_change(self) -> bool:
+        """Konfirmasi ganti posisi"""
+        if self.waiting_confirmation and self.pending_action and self.pending_action.startswith("position_"):
+            self.waiting_confirmation = False
+            position = self.pending_action.replace("position_", "")
+            self.tracker.position = position
+            self.memory.add_favorite_position(position)
+            self.pending_action = None
+            return True
+        return False
     
     # =========================================================================
     # STATUS
@@ -294,16 +383,15 @@ class BaseCharacter:
 ╠══════════════════════════════════════════════════════════════╣
 ║ 👗 PAKAIAN: {self.tracker.get_clothing_summary()}
 ║ 📍 POSISI: {self.tracker.position}
-║ 🔥 AROUSAL: {self.tracker.arousal}% | DESIRE: {self.tracker.desire}%
-║ 💪 STAMINA: {self.tracker.stamina}%
+║ 🔥 AROUSAL: {self.emotional.arousal:.0f}% | DESIRE: {self.emotional.desire:.0f}%
+║ 💪 STAMINA: {self.emotional.stamina:.0f}%
 ╠══════════════════════════════════════════════════════════════╣
 ║ 💦 MAS CLIMAX: {self.mas_climax_this_session}x
 ║ 💦 ROLE CLIMAX: {self.my_climax_this_session}x
 ╠══════════════════════════════════════════════════════════════╣
 ║ 📝 PREFERENSI MAS:
-║    Posisi Favorit: {self.tracker.get_mas_preference('favorite_position', '-')}
 ║    Kecepatan: {self.tracker.get_mas_preference('preferred_speed', 'medium')}
-║    Intensitas: {self.tracker.get_mas_preference('preferred_intensity', 'medium')}
+║    Posisi Favorit: {', '.join(self.memory.get_favorite_positions()[-3:]) if self.memory.get_favorite_positions() else '-'}
 ╚══════════════════════════════════════════════════════════════╝
 """
     
@@ -324,29 +412,35 @@ class BaseCharacter:
             'personality_traits': self.personality_traits,
             'tracker': self.tracker.to_dict(),
             'emotional': self.emotional.to_dict(),
-            'relationship': self.relationship.to_dict(),
-            'conversations': list(self.conversations),
-            'service_phase': self.service_phase.value,
+            'memory': self.memory.to_dict(),
             'session_start_time': self.session_start_time,
             'mas_climax_this_session': self.mas_climax_this_session,
             'my_climax_this_session': self.my_climax_this_session,
             'booking_location': self.booking_location,
-            'booking_price': self.booking_price
+            'booking_price': self.booking_price,
+            'booking_duration': self.booking_duration,
+            'negotiation_active': self.negotiation_active,
+            'negotiation_service': self.negotiation_service,
+            'negotiation_price': self.negotiation_price,
+            'deal_confirmed': self.deal_confirmed,
+            'waiting_confirmation': self.waiting_confirmation
         }
     
     def from_dict(self, data: Dict):
         """Load dari dict"""
         self.tracker.from_dict(data.get('tracker', {}))
         self.emotional.from_dict(data.get('emotional', {}))
-        self.relationship.from_dict(data.get('relationship', {}))
-        self.conversations = deque(data.get('conversations', []), maxlen=100)
-        self.service_phase = ServicePhase(data.get('service_phase', 'waiting'))
+        self.memory.from_dict(data.get('memory', {}))
         self.session_start_time = data.get('session_start_time', 0)
         self.mas_climax_this_session = data.get('mas_climax_this_session', 0)
         self.my_climax_this_session = data.get('my_climax_this_session', 0)
         self.booking_location = data.get('booking_location', '')
         self.booking_price = data.get('booking_price', 0)
-
-
-# Helper untuk random
-import random
+        self.booking_duration = data.get('booking_duration', 0)
+        self.negotiation_active = data.get('negotiation_active', False)
+        self.negotiation_service = data.get('negotiation_service')
+        self.negotiation_price = data.get('negotiation_price', 0)
+        self.deal_confirmed = data.get('deal_confirmed', False)
+        self.waiting_confirmation = data.get('waiting_confirmation', False)
+        
+        self.is_active = self.session_start_time > 0
