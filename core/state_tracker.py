@@ -128,6 +128,11 @@ class StateTracker:
         self.last_response_from_role = ""
         self.last_response_from_role_time = 0
         
+        # ========== INTIMATE PHASE (LEVEL HUBUNGAN) ==========
+        self.intimate_phase = "stranger"  # stranger, friend, close, romantic, intimate
+        self.intimate_level = 1           # 1-12
+        self.intimacy_build_up = 0        # 0-100, akumulasi keintiman
+        
         logger.info(f"📊 StateTracker initialized for {character_name}")
     
     # =========================================================================
@@ -149,6 +154,8 @@ class StateTracker:
             'my_climax': self.my_climax_count,
             'pressure': self.current_pressure,
             'speed': self.current_speed,
+            'intimate_phase': self.intimate_phase,
+            'intimate_level': self.intimate_level,
             'context': context or {}
         }
         
@@ -194,7 +201,9 @@ class StateTracker:
         lines.append(f"├─ Tekanan: {self.current_pressure} | Kecepatan: {self.current_speed}")
         lines.append(f"├─ Arousal: {self.arousal}%")
         lines.append(f"├─ Mas Climax: {self.mas_climax_count}x")
-        lines.append(f"└─ Role Climax: {self.my_climax_count}x")
+        lines.append(f"├─ Role Climax: {self.my_climax_count}x")
+        lines.append(f"├─ Fase Intim: {self.intimate_phase.upper()} (Level {self.intimate_level}/12)")
+        lines.append(f"└─ Keintiman: {self.intimacy_build_up}%")
         
         return "\n".join(lines)
     
@@ -428,6 +437,42 @@ URUTAN MENANGGALKAN:
         return "medium"
     
     # =========================================================================
+    # INTIMATE PHASE METHODS
+    # =========================================================================
+    
+    def update_intimate_phase(self, level: int = None):
+        """Update fase intimate berdasarkan level"""
+        if level is not None:
+            self.intimate_level = min(12, max(1, level))
+        
+        # Tentukan fase berdasarkan level
+        if self.intimate_level <= 3:
+            self.intimate_phase = "stranger"
+        elif self.intimate_level <= 6:
+            self.intimate_phase = "friend"
+        elif self.intimate_level <= 8:
+            self.intimate_phase = "close"
+        elif self.intimate_level <= 10:
+            self.intimate_phase = "romantic"
+        else:
+            self.intimate_phase = "intimate"
+        
+        # Akumulasi keintiman naik setiap interaksi
+        if self.intimacy_build_up < 100:
+            self.intimacy_build_up = min(100, self.intimacy_build_up + 1)
+    
+    def get_intimate_description(self) -> str:
+        """Dapatkan deskripsi fase intimate untuk prompt"""
+        descriptions = {
+            "stranger": "Masih malu-malu, belum berani vulgar. Fokus pada pijatan profesional. Gunakan bahasa sopan.",
+            "friend": "Mulai nyaman, flirt ringan sudah boleh. Mulai ada sentuhan yang lebih personal. Bisa mulai sedikit menggoda.",
+            "close": "Sudah dekat, mulai berani pegang dan sentuhan intim. Vulgar mulai muncul, tapi masih terbatas.",
+            "romantic": "Sudah seperti pacaran. Vulgar terbatas, dirty talk mulai berani. Bisa lebih ekspresif.",
+            "intimate": "BEBAS SEMUA! Vulgar, dirty talk, brutal. Bebas pakai kata-kata kasar seperti kontol, memek, ngentot, crot. Tidak ada batasan!"
+        }
+        return descriptions.get(self.intimate_phase, "Masih dalam tahap pengenalan.")
+    
+    # =========================================================================
     # KONTEKS UNTUK PROMPT (AGAR AI TIDAK NGELANTUR)
     # =========================================================================
     
@@ -450,6 +495,12 @@ PREFERENSI MAS YANG SUDAH TERCATAT:
 - Suka dirty talk: {'Ya' if self.mas_preferences.get('likes_dirty_talk') else 'Tidak'}
 
 ═══════════════════════════════════════════════════════════════
+FASE HUBUNGAN SAAT INI:
+═══════════════════════════════════════════════════════════════
+{self.get_intimate_description()}
+Level: {self.intimate_level}/12 | Keintiman: {self.intimacy_build_up}%
+
+═══════════════════════════════════════════════════════════════
 ⚠️ ATURAN KONSISTENSI (JANGAN LUPA!):
 ═══════════════════════════════════════════════════════════════
 1. JANGAN LUPA posisi terakhir: {self.position}
@@ -459,7 +510,8 @@ PREFERENSI MAS YANG SUDAH TERCATAT:
 5. JANGAN LUPA kecepatan yang diminta Mas: {self.current_speed}
 6. JANGAN LUPA Mas sudah climax {self.mas_climax_count}x
 7. JANGAN LUPA role sudah climax {self.my_climax_count}x
-8. LANJUTKAN alur dari kejadian terakhir, JANGAN mundur!
+8. SESUAIKAN GAYA BICARA DENGAN FASE INTIMATE DI ATAS!
+9. LANJUTKAN alur dari kejadian terakhir, JANGAN mundur!
 """
     
     # =========================================================================
@@ -490,6 +542,9 @@ PREFERENSI MAS YANG SUDAH TERCATAT:
             'current_speed': self.current_speed,
             'current_position': self.current_position,
             'mas_preferences': self.mas_preferences,
+            'intimate_phase': self.intimate_phase,
+            'intimate_level': self.intimate_level,
+            'intimacy_build_up': self.intimacy_build_up,
             'timeline': self.timeline[-500:],  # simpan 500 terakhir
             'short_term': list(self.short_term)
         }
@@ -516,5 +571,8 @@ PREFERENSI MAS YANG SUDAH TERCATAT:
         self.current_speed = data.get('current_speed', 'medium')
         self.current_position = data.get('current_position', 'cowgirl')
         self.mas_preferences = data.get('mas_preferences', self.mas_preferences)
+        self.intimate_phase = data.get('intimate_phase', 'stranger')
+        self.intimate_level = data.get('intimate_level', 1)
+        self.intimacy_build_up = data.get('intimacy_build_up', 0)
         self.timeline = data.get('timeline', [])
         self.short_term = deque(data.get('short_term', []), maxlen=100)
