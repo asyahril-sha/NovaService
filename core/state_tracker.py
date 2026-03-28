@@ -38,6 +38,18 @@ class ServicePhase(str, Enum):
     BREAK = "break"                   # istirahat
     COMPLETED = "completed"           # selesai
 
+    # Pelacur phases
+    PELACUR_CONFIRMATION = "pelacur_confirmation"
+    PELACUR_BJ = "pelacur_bj"
+    PELACUR_KISSING = "pelacur_kissing"
+    PELACUR_FOREPLAY_MAS = "pelacur_foreplay_mas"
+    PELACUR_COWGIRL = "pelacur_cowgirl"
+    PELACUR_CUNNILINGUS = "pelacur_cunnilingus"
+    PELACUR_MISSIONARY = "pelacur_missionary"
+    PELACUR_DOGGY = "pelacur_doggy"
+    PELACUR_POSITION_CHANGE = "pelacur_position_change"
+    PELACUR_AFTERCARE = "pelacur_aftercare"
+
 
 class StateTracker:
     """
