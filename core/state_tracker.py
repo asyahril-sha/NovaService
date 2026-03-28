@@ -130,7 +130,7 @@ class StateTracker:
         
         # ========== INTIMATE PHASE (LEVEL HUBUNGAN) ==========
         self.intimate_phase = "stranger"  # stranger, friend, close, romantic, intimate
-        self.intimate_level = 7           # 1-12
+        self.intimate_level = 5           # 1-12
         self.intimacy_build_up = 0        # 0-100, akumulasi keintiman
         
         logger.info(f"📊 StateTracker initialized for {character_name}")
