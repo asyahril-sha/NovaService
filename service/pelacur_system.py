@@ -57,7 +57,7 @@ class PelacurSystem(PelacurAuto, PelacurManual):
         logger.info(f"🔥 PelacurSystem initialized for {character.name}")
         logger.info(f"   Inherited from: PelacurAuto, PelacurManual")
 
-        def update_mas_clothing(self, item: str, status: str):
+    def update_mas_clothing(self, item: str, status: str):
         """Update status pakaian Mas"""
         if item in self.mas_clothing:
             self.mas_clothing[item] = status
