@@ -1,7 +1,7 @@
 # commands/role.py
 """
 Role Commands NovaService
-/role therapist, /role pelacur, /statusrole
+/role therapist, /role pelacur
 """
 
 import logging
@@ -10,19 +10,17 @@ from telegram import Update
 from telegram.ext import ContextTypes, CommandHandler
 
 from config import get_settings
-from utils.user_mode import set_user_mode, get_user_mode, get_active_role
+from utils.user_mode import set_user_mode
 
 logger = logging.getLogger(__name__)
 
 
 # Daftar karakter
-THERAPIST_CHARACTERS = [
-    "anya", "syifa", "laura", "tara", "pevita", "maudy", "zara", "angela"
-]
+THERAPIST_CHARACTERS = ["anya", "syifa", "laura", "tara", "pevita", "maudy", "zara", "angela"]
+PELACUR_CHARACTERS = ["davina", "michelle", "jihane", "tissa", "hana", "shindy", "nadya", "alyssa"]
 
-PELACUR_CHARACTERS = [
-    "davina", "michelle", "jihane", "tissa", "hana", "shindy", "nadya", "alyssa"
-]
+# Dictionary untuk menyimpan role instance per user
+_user_roles = {}
 
 
 async def role_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -46,15 +44,11 @@ async def role_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     role_type = args[0].lower()
     
     if role_type == "therapist":
-        # Pilih karakter random
         selected = random.choice(THERAPIST_CHARACTERS)
         await _activate_therapist(user_id, selected, update)
-    
     elif role_type == "pelacur":
-        # Pilih karakter random
         selected = random.choice(PELACUR_CHARACTERS)
         await _activate_pelacur(user_id, selected, update)
-    
     else:
         await update.message.reply_text(
             f"Role '{role_type}' gak ada. Pilih: therapist atau pelacur",
@@ -64,93 +58,101 @@ async def role_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 async def _activate_therapist(user_id: int, character_key: str, update: Update):
     """Aktifkan therapist character"""
-    from roles.manager import get_role_manager
-    from characters.therapist import (
-        AnyaCharacter, SyifaCharacter, LauraCharacter,
-        TaraCharacter, PevitaCharacter, MaudyCharacter,
-        ZaraCharacter, AngelaCharacter
-    )
-    
-    character_map = {
-        "anya": AnyaCharacter,
-        "syifa": SyifaCharacter,
-        "laura": LauraCharacter,
-        "tara": TaraCharacter,
-        "pevita": PevitaCharacter,
-        "maudy": MaudyCharacter,
-        "zara": ZaraCharacter,
-        "angela": AngelaCharacter
-    }
-    
-    character_class = character_map.get(character_key)
-    if not character_class:
-        await update.message.reply_text("Karakter tidak ditemukan.")
-        return
-    
-    # Buat instance karakter
-    character = character_class()
-    
-    # Set booking info (default untuk therapist)
-    character.booking_price = 500000  # HJ + extra
-    character.booking_location = "ruang pijat"
-    
-    # Simpan ke role manager
-    role_manager = get_role_manager()
-    role_manager.set_role(user_id, character, "therapist")
-    
-    # Set user mode
-    await set_user_mode(user_id, 'role', 'therapist')
-    
-    # Start session
-    greeting = await character.start_session()
-    
-    await update.message.reply_text(greeting, parse_mode='Markdown')
+    try:
+        # Import karakter
+        if character_key == "anya":
+            from characters.therapist.anya import AnyaCharacter
+            character = AnyaCharacter()
+        elif character_key == "syifa":
+            from characters.therapist.syifa import SyifaCharacter
+            character = SyifaCharacter()
+        elif character_key == "laura":
+            from characters.therapist.laura import LauraCharacter
+            character = LauraCharacter()
+        elif character_key == "tara":
+            from characters.therapist.tara import TaraCharacter
+            character = TaraCharacter()
+        elif character_key == "pevita":
+            from characters.therapist.pevita import PevitaCharacter
+            character = PevitaCharacter()
+        elif character_key == "maudy":
+            from characters.therapist.maudy import MaudyCharacter
+            character = MaudyCharacter()
+        elif character_key == "zara":
+            from characters.therapist.zara import ZaraCharacter
+            character = ZaraCharacter()
+        elif character_key == "angela":
+            from characters.therapist.angela import AngelaCharacter
+            character = AngelaCharacter()
+        else:
+            await update.message.reply_text("Karakter tidak ditemukan.")
+            return
+        
+        # Set booking info
+        character.booking_price = 500000
+        character.booking_location = "ruang pijat"
+        
+        # Simpan ke memory
+        _user_roles[user_id] = character
+        await set_user_mode(user_id, 'role', 'therapist')
+        
+        # Start session
+        greeting = await character.start_session()
+        await update.message.reply_text(greeting, parse_mode='Markdown')
+        
+    except Exception as e:
+        logger.error(f"Activate therapist error: {e}", exc_info=True)
+        await update.message.reply_text(f"❌ Error: {str(e)}")
 
 
 async def _activate_pelacur(user_id: int, character_key: str, update: Update):
     """Aktifkan pelacur character"""
-    from roles.manager import get_role_manager
-    from characters.pelacur import (
-        DavinaCharacter, MichelleCharacter, JihaneCharacter,
-        TissaCharacter, HanaCharacter, ShindyCharacter,
-        NadyaCharacter, AlyssaCharacter
-    )
-    
-    character_map = {
-        "davina": DavinaCharacter,
-        "michelle": MichelleCharacter,
-        "jihane": JihaneCharacter,
-        "tissa": TissaCharacter,
-        "hana": HanaCharacter,
-        "shindy": ShindyCharacter,
-        "nadya": NadyaCharacter,
-        "alyssa": AlyssaCharacter
-    }
-    
-    character_class = character_map.get(character_key)
-    if not character_class:
-        await update.message.reply_text("Karakter tidak ditemukan.")
-        return
-    
-    # Buat instance karakter
-    character = character_class()
-    
-    # Set booking info
-    character.booking_price = 10000000  # 10jt
-    character.booking_location = "lokasi booking"
-    character.booking_duration = 10  # 10 jam
-    
-    # Simpan ke role manager
-    role_manager = get_role_manager()
-    role_manager.set_role(user_id, character, "pelacur")
-    
-    # Set user mode
-    await set_user_mode(user_id, 'role', 'pelacur')
-    
-    # Start session
-    greeting = await character.start_session()
-    
-    await update.message.reply_text(greeting, parse_mode='Markdown')
+    try:
+        # Import karakter
+        if character_key == "davina":
+            from characters.pelacur.davina import DavinaCharacter
+            character = DavinaCharacter()
+        elif character_key == "michelle":
+            from characters.pelacur.michelle import MichelleCharacter
+            character = MichelleCharacter()
+        elif character_key == "jihane":
+            from characters.pelacur.jihane import JihaneCharacter
+            character = JihaneCharacter()
+        elif character_key == "tissa":
+            from characters.pelacur.tissa import TissaCharacter
+            character = TissaCharacter()
+        elif character_key == "hana":
+            from characters.pelacur.hana import HanaCharacter
+            character = HanaCharacter()
+        elif character_key == "shindy":
+            from characters.pelacur.shindy import ShindyCharacter
+            character = ShindyCharacter()
+        elif character_key == "nadya":
+            from characters.pelacur.nadya import NadyaCharacter
+            character = NadyaCharacter()
+        elif character_key == "alyssa":
+            from characters.pelacur.alyssa import AlyssaCharacter
+            character = AlyssaCharacter()
+        else:
+            await update.message.reply_text("Karakter tidak ditemukan.")
+            return
+        
+        # Set booking info
+        character.booking_price = 10000000
+        character.booking_location = "lokasi booking"
+        character.booking_duration = 10
+        
+        # Simpan ke memory
+        _user_roles[user_id] = character
+        await set_user_mode(user_id, 'role', 'pelacur')
+        
+        # Start session
+        greeting = await character.start_session()
+        await update.message.reply_text(greeting, parse_mode='Markdown')
+        
+    except Exception as e:
+        logger.error(f"Activate pelacur error: {e}", exc_info=True)
+        await update.message.reply_text(f"❌ Error: {str(e)}")
 
 
 async def statusrole_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -161,29 +163,21 @@ async def statusrole_command(update: Update, context: ContextTypes.DEFAULT_TYPE)
     if user_id != settings.admin_id:
         return
     
-    mode = await get_user_mode(user_id)
-    active_role = await get_active_role(user_id)
-    
-    if mode != 'role' or not active_role:
-        await update.message.reply_text(
-            "💜 Tidak ada role yang aktif.\n\n"
-            "Gunakan `/role therapist` atau `/role pelacur` untuk mulai, Mas.",
-            parse_mode='Markdown'
-        )
-        return
-    
-    from roles.manager import get_role_manager
-    role_manager = get_role_manager()
-    role = role_manager.get_role(user_id)
-    
+    role = _user_roles.get(user_id)
     if role:
         status_text = role.get_status()
         await update.message.reply_text(status_text, parse_mode='Markdown')
     else:
         await update.message.reply_text(
-            "Role tidak ditemukan. Coba pilih role lagi, Mas.",
+            "💜 Tidak ada role yang aktif.\n\n"
+            "Gunakan `/role therapist` atau `/role pelacur` untuk mulai, Mas.",
             parse_mode='Markdown'
         )
+
+
+def get_user_role(user_id: int):
+    """Dapatkan role instance untuk user"""
+    return _user_roles.get(user_id)
 
 
 def register_role_commands(app):
