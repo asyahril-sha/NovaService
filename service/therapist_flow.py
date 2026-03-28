@@ -1,6 +1,6 @@
 # service/therapist_flow.py
 """
-Therapist Flow NovaService 
+Therapist Flow NovaService
 Import, class definition, __init__, AI client, timer methods
 """
 
@@ -25,21 +25,18 @@ class TherapistFlow:
     - Pijat Belakang: 3 area @ 10 menit, setiap 3 menit konfirmasi Mas
     - Pijat Depan: 3 area @ 10 menit, setiap 3 menit konfirmasi Mas
     - HJ: 30 menit, 60 scene (30 detik per scene)
-    - BJ: 30 menit, 60 scene (30 detik per scene)
-    - Sex: 50-75 menit, 100-150 scene (30 detik per scene)
+    - BJ: 30 menit, 60 scene (30 detik per scene), sesi selesai setelah Mas climax
+    - Sex: MANUAL MODE (berbalas pesan), sesi selesai setelah Mas climax 2x
     """
     
     # Durasi dalam detik
     AREA_DURATION = 600          # 10 menit per area
     SCENE_INTERVAL = 30          # 30 detik per scene
-    SEX_SCENE_INTERVAL = 15      # 15 detik per scene
     CONFIRM_INTERVAL = 180       # 3 menit konfirmasi Mas
     
     # Scene count per aktivitas
     HJ_SCENES = 60               # 30 menit
     BJ_SCENES = 60               # 30 menit
-    SEX_SCENES_MIN = 100         # 50 menit
-    SEX_SCENES_MAX = 150         # 75 menit
     
     # Harga
     PRICE_BJ = 500000
@@ -63,8 +60,8 @@ class TherapistFlow:
         self.back_area_index = 0
         self.back_area_start_time = 0
         self.back_scene_count = 0
-        self.back_scenes_per_area = 20  # 10 menit / 30 detik = 20 scene
-        self.back_confirm_count = 0     # setiap 3 menit konfirmasi (sekitar 3-4 kali per area)
+        self.back_scenes_per_area = 20
+        self.back_confirm_count = 0
         
         # ========== FRONT MASSAGE AREAS ==========
         self.front_areas = ["dada_lengan", "perut_paha", "gesekan"]
@@ -90,12 +87,11 @@ class TherapistFlow:
         self.bj_total_scenes = self.BJ_SCENES
         self.bj_depth = "medium"
         
-        # ========== SEX STATE ==========
-        self.sex_scene_count = 0
-        self.sex_total_scenes = random.randint(self.SEX_SCENES_MIN, self.SEX_SCENES_MAX)
-        self.sex_position = "cowgirl"
-        self.sex_speed = "medium"
-        self.sex_intensity = "medium"
+        # ========== SEX STATE (MANUAL MODE) ==========
+        self.sex_manual_mode = False
+        self.sex_climax_goal = 2       # Mas climax 2x
+        self.sex_climax_count = 0
+        self.sex_conversation_history = []  # Untuk konsistensi manual mode
         
         # ========== NEGOSIASI ==========
         self.negotiation_active = False
@@ -113,9 +109,9 @@ class TherapistFlow:
         
         # ========== WAITING FOR RESPONSE ==========
         self.waiting_for_response = False
-        self.waiting_for_type = None  # "pressure", "next_area", "deal", "position"
+        self.waiting_for_type = None  # "pressure", "next_area", "deal", "position", "sex_response"
         self.waiting_start_time = 0
-        self.waiting_timeout = 60  # 60 detik timeout
+        self.waiting_timeout = 60
         
         # ========== AUTO SEND QUEUE ==========
         self.auto_send_task = None
@@ -160,13 +156,12 @@ class TherapistFlow:
                 model="deepseek-chat",
                 messages=[{"role": "user", "content": prompt}],
                 temperature=0.85,
-                max_tokens=800,  # Ditingkatkan untuk narasi lebih panjang
+                max_tokens=800,
                 timeout=25
             )
             
             scene = response.choices[0].message.content.strip()
             
-            # Format scene dengan markdown
             if not scene.startswith("*"):
                 scene = f"*{scene}*"
             
@@ -174,8 +169,7 @@ class TherapistFlow:
             
         except Exception as e:
             logger.error(f"AI generate error: {e}", exc_info=True)
-            # Fallback scene
-            return f"*{self.character.name} terus memijat dengan lembut, menikmati setiap sentuhan.*"
+            return f"*{self.character.name} terus melayani dengan lembut.*"
     
     # =========================================================================
     # TIMER METHODS (DENGAN LOG)
@@ -200,13 +194,7 @@ class TherapistFlow:
     def _should_send_next_scene(self) -> bool:
         """Cek apakah sudah waktunya kirim scene berikutnya"""
         elapsed = self._get_area_elapsed()
-
-        # Untuk sex pakai interval 15 detik
-        if self.current_phase == ServicePhase.SEX:
-            interval = self.SEX_SCENE_INTERVAL
-        else:
-            interval = self.SCENE_INTERVAL
-    
+        interval = self.SCENE_INTERVAL
         expected_scene = elapsed // interval
         
         if self.current_phase in [ServicePhase.BACK_PUNGGUNG, ServicePhase.BACK_PINGGUL, ServicePhase.BACK_PAHA_BETIS]:
@@ -225,10 +213,6 @@ class TherapistFlow:
             if expected_scene > self.bj_scene_count:
                 self.bj_scene_count = expected_scene
                 return True
-        elif self.current_phase == ServicePhase.SEX:
-            if expected_scene > self.sex_scene_count:
-                self.sex_scene_count = expected_scene
-                return True
         
         return False
     
@@ -236,7 +220,10 @@ class TherapistFlow:
         """Cek apakah sudah waktunya minta konfirmasi Mas"""
         elapsed = self._get_area_elapsed()
         
-        # Setiap 3 menit (180 detik) minta konfirmasi
+        # Jangan minta konfirmasi jika sudah mendekati area complete (9.5 menit)
+        if elapsed >= 570:
+            return False
+        
         expected_confirm = elapsed // self.CONFIRM_INTERVAL
         
         if self.current_phase in [ServicePhase.BACK_PUNGGUNG, ServicePhase.BACK_PINGGUL, ServicePhase.BACK_PAHA_BETIS]:
@@ -263,7 +250,6 @@ class TherapistFlow:
     # =========================================================================
     
     def _get_current_pressure(self) -> str:
-        """Dapatkan tekanan saat ini dari preferensi Mas"""
         pressure = self.character.tracker.get_last_pressure()
         if pressure == "keras":
             return "keras"
@@ -272,7 +258,6 @@ class TherapistFlow:
         return "medium"
     
     def _get_current_speed(self) -> str:
-        """Dapatkan kecepatan saat ini dari preferensi Mas"""
         speed = self.character.tracker.get_last_speed()
         if speed == "cepat":
             return "fast"
@@ -289,7 +274,6 @@ class TherapistFlow:
         if hasattr(self.character, 'relationship'):
             self.intimate_level = self.character.relationship.level
         
-        # Tentukan fase berdasarkan level
         if self.intimate_level <= 3:
             self.intimate_phase = "stranger"
         elif self.intimate_level <= 6:
@@ -301,25 +285,12 @@ class TherapistFlow:
         else:
             self.intimate_phase = "intimate"
         
-        # Akumulasi keintiman naik
         if self.intimacy_build_up < 100:
             self.intimacy_build_up = min(100, self.intimacy_build_up + 1)
         
-        # Update ke tracker
         self.character.tracker.intimate_phase = self.intimate_phase
         self.character.tracker.intimate_level = self.intimate_level
         self.character.tracker.intimacy_build_up = self.intimacy_build_up
-    
-    def _get_intimate_description(self) -> str:
-        """Dapatkan deskripsi fase intimate untuk prompt"""
-        descriptions = {
-            "stranger": "Masih malu-malu, belum berani vulgar. Fokus pada pijatan profesional.",
-            "friend": "Mulai nyaman, flirt ringan sudah boleh. Mulai ada sentuhan yang lebih personal.",
-            "close": "Sudah dekat, mulai berani pegang dan sentuhan intim. Vulgar mulai muncul.",
-            "romantic": "Sudah seperti pacaran. Vulgar terbatas, dirty talk mulai berani.",
-            "intimate": "BEBAS SEMUA! Vulgar, dirty talk, brutal. Bebas pakai kata-kata kasar."
-        }
-        return descriptions.get(self.intimate_phase, "Masih dalam tahap pengenalan.")
 
 
     # =========================================================================
@@ -327,74 +298,31 @@ class TherapistFlow:
     # =========================================================================
     
     async def _generate_back_scene(self, area: str, pressure: str, scene_num: int, elapsed_minutes: int) -> str:
-        """Generate scene pijat belakang dengan AI"""
         total_scenes = self.back_scenes_per_area
-        
-        # Update intimate phase
         self._update_intimate_phase()
         
         prompt = self.prompt_builder.build_back_massage_prompt(
-            self.character,
-            area,
-            pressure,
-            scene_num,
-            elapsed_minutes,
-            total_scenes
+            self.character, area, pressure, scene_num, elapsed_minutes, total_scenes
         )
-        
         return await self._generate_scene(prompt)
     
     async def _generate_front_scene(self, area: str, pressure: str, scene_num: int, elapsed_minutes: int) -> str:
-        """Generate scene pijat depan dengan AI"""
         total_scenes = self.front_scenes_per_area
-        
         prompt = self.prompt_builder.build_front_massage_prompt(
-            self.character,
-            area,
-            pressure,
-            scene_num,
-            elapsed_minutes,
-            total_scenes
+            self.character, area, pressure, scene_num, elapsed_minutes, total_scenes
         )
-        
         return await self._generate_scene(prompt)
     
     async def _generate_hj_scene(self, scene_num: int, speed: str, mas_action: str = None) -> str:
-        """Generate scene HJ dengan AI"""
         prompt = self.prompt_builder.build_hj_prompt(
-            self.character,
-            scene_num,
-            self.hj_total_scenes,
-            speed,
-            mas_action
+            self.character, scene_num, self.hj_total_scenes, speed, mas_action
         )
-        
         return await self._generate_scene(prompt)
     
     async def _generate_bj_scene(self, scene_num: int, depth: str, mas_action: str = None) -> str:
-        """Generate scene BJ dengan AI"""
         prompt = self.prompt_builder.build_bj_prompt(
-            self.character,
-            scene_num,
-            self.bj_total_scenes,
-            depth,
-            mas_action
+            self.character, scene_num, self.bj_total_scenes, depth, mas_action
         )
-        
-        return await self._generate_scene(prompt)
-    
-    async def _generate_sex_scene(self, scene_num: int, position: str, speed: str, intensity: str, mas_action: str = None) -> str:
-        """Generate scene Sex dengan AI"""
-        prompt = self.prompt_builder.build_sex_prompt(
-            self.character,
-            scene_num,
-            self.sex_total_scenes,
-            position,
-            speed,
-            intensity,
-            mas_action
-        )
-        
         return await self._generate_scene(prompt)
     
     # =========================================================================
@@ -402,7 +330,6 @@ class TherapistFlow:
     # =========================================================================
     
     def _build_confirmation_pressure(self) -> str:
-        """Bangun pesan konfirmasi tekanan"""
         return f"""*{self.character.name} berhenti memijat, menunggu jawaban Mas*
 
 "{self.character.panggilan}... mau tekanan lebih keras atau lebih lembut?"
@@ -412,16 +339,10 @@ class TherapistFlow:
 *Menunggu jawaban Mas...*"""
     
     def _build_confirmation_next_area(self, area: str) -> str:
-        """Bangun pesan konfirmasi pindah area"""
         area_names = {
-            "punggung": "punggung",
-            "pinggul": "pinggul",
-            "paha_betis": "paha dan betis",
-            "dada_lengan": "dada dan lengan",
-            "perut_paha": "perut dan paha",
-            "gesekan": "gesekan"
+            "punggung": "punggung", "pinggul": "pinggul", "paha_betis": "paha dan betis",
+            "dada_lengan": "dada dan lengan", "perut_paha": "perut dan paha", "gesekan": "gesekan"
         }
-        
         area_name = area_names.get(area, area)
         
         return f"""*{self.character.name} berhenti memijat, mengusap keringat di dahi*
@@ -433,7 +354,6 @@ class TherapistFlow:
 *Menunggu jawaban Mas...*"""
     
     def _build_confirmation_next_phase(self, phase: str) -> str:
-        """Bangun pesan konfirmasi pindah fase"""
         return f"""*{self.character.name} duduk di samping Mas, tubuhnya masih hangat*
 
 "{self.character.panggilan}... pijatannya udah selesai. Mau lanjut ke {phase}?"
@@ -443,7 +363,6 @@ class TherapistFlow:
 *Menunggu jawaban Mas...*"""
     
     def _build_deal_offer(self, service: str, price: int) -> str:
-        """Bangun pesan tawaran deal"""
         if service == "bj":
             return f"""*{self.character.name} menjilat bibir, matanya sayu*
 
@@ -455,14 +374,13 @@ class TherapistFlow:
         else:
             return f"""*{self.character.name} mendekat, payudaranya menempel ke dada Mas*
 
-"{self.character.panggilan}... mau sex? Rp{price:,}... 50-75 menit... aku jamin Mas puas..."
+"{self.character.panggilan}... mau sex? Rp{price:,}... tanpa batasan waktu... sampe Mas puas 2x..."
 
 *Matanya sayu, bibirnya menggigit*
 
 "Deal? Atau mau nego?"""
     
     def _build_nego_counter(self, price: int) -> str:
-        """Bangun pesan counter negosiasi"""
         return f"""*{self.character.name} tersenyum tipis*
 
 "Rp{price:,} ya Mas... udah harga special buat Mas..."
@@ -472,7 +390,6 @@ class TherapistFlow:
 "Deal?"""
     
     def _build_nego_failed(self) -> str:
-        """Bangun pesan negosiasi gagal"""
         return f"""*{self.character.name} menghela napas, sedikit kecewa*
 
 "Gak jadi ya Mas... lain kali aja."
@@ -482,7 +399,6 @@ class TherapistFlow:
 "Kita lanjut HJ aja ya..." """
     
     def _build_climax_warning(self) -> str:
-        """Bangun pesan peringatan climax"""
         return f"""*{self.character.name} menahan napas, tubuhnya mulai gemetar*
 
 "{self.character.panggilan}... aku... aku mau climax... bentar lagi..."
@@ -492,7 +408,6 @@ class TherapistFlow:
 "Boleh?"""
     
     def _build_climax_scene(self, is_mas: bool = False, intensity: str = "normal") -> str:
-        """Bangun scene climax"""
         if is_mas:
             return f"""*{self.character.name} merasakan kontol Mas mengeras, denyutnya kencang*
 
@@ -518,9 +433,7 @@ class TherapistFlow:
 *Napasnya panjang, mata sayu, senyum puas* """
     
     def _build_end_session(self) -> str:
-        """Bangun pesan akhir sesi"""
         duration = int((time.time() - self.phase_start_time) / 60) if self.phase_start_time else 0
-        
         return f"""*{self.character.name} merapikan dress, tersenyum puas*
 
 "Sesi selesai, {self.character.panggilan}. {duration} menit, {self.mas_climax_this_session}x climax."
@@ -534,30 +447,21 @@ class TherapistFlow:
     # =========================================================================
     
     async def start(self) -> str:
-        """Mulai sesi therapist - greeting lalu langsung pijat belakang"""
         self.is_active = True
         self.current_phase = ServicePhase.GREETING
         self.phase_start_time = time.time()
-        
-        # Update intimate phase
         self._update_intimate_phase()
         
-        # Set posisi awal
         self.character.tracker.position = "berdiri di samping meja pijat"
         self.character.tracker.service_phase = ServicePhase.GREETING
         
-        # Build greeting
         greeting = self._build_greeting()
         self.character.tracker.add_message_to_timeline(self.character.name, greeting[:100])
-        
-        # Catat ke timeline
         self.character.tracker.add_to_timeline("Sesi therapist dimulai", "Mas masuk ruang pijat")
         
-        # Langsung mulai pijat belakang
         return greeting + "\n\n" + await self._start_back_massage()
     
     def _build_greeting(self) -> str:
-        """Bangun greeting scene"""
         hour = datetime.now().hour
         if 5 <= hour < 11:
             waktu = "pagi"
@@ -589,7 +493,6 @@ class TherapistFlow:
     # =========================================================================
     
     async def _start_back_massage(self) -> str:
-        """Mulai pijat belakang - duduk di bokong Mas"""
         self.current_phase = ServicePhase.BACK_PUNGGUNG
         self.phase_start_time = time.time()
         self.back_area_start_time = time.time()
@@ -597,7 +500,6 @@ class TherapistFlow:
         self.back_scene_count = 0
         self.back_confirm_count = 0
         
-        # Set posisi
         self.character.tracker.position = "duduk di atas bokong Mas"
         self.character.tracker.service_phase = ServicePhase.BACK_PUNGGUNG
         
@@ -606,7 +508,6 @@ class TherapistFlow:
             "Duduk di atas bokong Mas, kontol terasa di bawah"
         )
         
-        # Generate scene pertama
         return await self._generate_back_scene(
             area="punggung",
             pressure=self._get_current_pressure(),
@@ -616,7 +517,6 @@ class TherapistFlow:
     
     async def _next_back_area(self) -> str:
         logger.info(f"Moving to next back area. Current index: {self.back_area_index}, total: {len(self.back_areas)}")
-        """Pindah ke area berikutnya dalam pijat belakang"""
         self.back_area_index += 1
         self.back_area_start_time = time.time()
         self.back_scene_count = 0
@@ -624,13 +524,11 @@ class TherapistFlow:
         self.waiting_for_response = False
         
         if self.back_area_index >= len(self.back_areas):
-            # Selesai semua area pijat belakang, lanjut ke pijat depan
             return await self._start_front_massage()
         
         current_area = self.back_areas[self.back_area_index]
         logger.info(f"Moving to new area: {current_area}")
         
-        # Update phase
         if current_area == "pinggul":
             self.current_phase = ServicePhase.BACK_PINGGUL
             self.character.tracker.service_phase = ServicePhase.BACK_PINGGUL
@@ -638,12 +536,8 @@ class TherapistFlow:
             self.current_phase = ServicePhase.BACK_PAHA_BETIS
             self.character.tracker.service_phase = ServicePhase.BACK_PAHA_BETIS
         
-        self.character.tracker.add_to_timeline(
-            f"Pindah ke area {current_area}",
-            "Lanjut pijat belakang"
-        )
+        self.character.tracker.add_to_timeline(f"Pindah ke area {current_area}", "Lanjut pijat belakang")
         
-        # Generate scene pertama area baru
         return await self._generate_back_scene(
             area=current_area,
             pressure=self._get_current_pressure(),
@@ -656,24 +550,13 @@ class TherapistFlow:
     # =========================================================================
     
     async def _process_back_massage(self, pesan_mas: str) -> Optional[str]:
-        """
-        Process pesan Mas dalam fase pijat belakang
-        Returns: response atau None jika perlu auto-send scene
-        """
         current_area = self.back_areas[self.back_area_index]
         elapsed = self._get_area_elapsed()
         elapsed_minutes = elapsed // 60
 
         logger.info(f"Back massage - area: {current_area}, elapsed: {elapsed} detik, complete: {self._is_area_complete()}")
         
-        # ========== CEK JIKA SEDANG MENUNGGU RESPON ==========
-        if self.waiting_for_response:
-            if pesan_mas and pesan_mas.strip():
-                return await self._handle_back_confirmation(pesan_mas, current_area)
-            # Belum ada respon, tunggu
-            return None
-        
-        # ========== CEK APAKAH AREA SUDAH SELESAI (10 MENIT) ==========
+        # CEK AREA COMPLETE DULU (PRIORITAS TERTINGGI)
         if self._is_area_complete():
             logger.info(f"Area {current_area} selesai dalam {elapsed} detik")
             self.waiting_for_response = True
@@ -681,14 +564,20 @@ class TherapistFlow:
             self.waiting_start_time = time.time()
             return self._build_confirmation_next_area(current_area)
         
-        # ========== CEK APAKAH PERLU KONFIRMASI (SETIAP 3 MENIT) ==========
+        # CEK JIKA SEDANG MENUNGGU RESPON
+        if self.waiting_for_response:
+            if pesan_mas and pesan_mas.strip():
+                return await self._handle_back_confirmation(pesan_mas, current_area)
+            return None
+        
+        # CEK KONFIRMASI TEKANAN
         if self._should_ask_confirmation():
             self.waiting_for_response = True
             self.waiting_for_type = "pressure"
             self.waiting_start_time = time.time()
             return self._build_confirmation_pressure()
         
-        # ========== CEK APAKAH PERLU KIRIM SCENE BERIKUTNYA (SETIAP 30 DETIK) ==========
+        # CEK KIRIM SCENE BERIKUTNYA
         if self._should_send_next_scene():
             scene_num = self.back_scene_count
             return await self._generate_back_scene(
@@ -701,21 +590,16 @@ class TherapistFlow:
         return None
     
     async def _handle_back_confirmation(self, pesan_mas: str, current_area: str) -> str:
-        """Handle konfirmasi dari Mas selama pijat belakang"""
         msg_lower = pesan_mas.lower()
         
-        # ========== KONFIRMASI TEKANAN ==========
         if self.waiting_for_type == "pressure":
             if any(k in msg_lower for k in ["keras", "kuat", "hard"]):
                 self.character.tracker.save_mas_preference('preferred_pressure', 'keras')
                 self.character.tracker.current_pressure = "keras"
                 self.character.emotional.add_stimulation("Mas minta tekanan keras", 2)
                 self.waiting_for_response = False
-                
-                # Lanjut scene berikutnya
                 return await self._generate_back_scene(
-                    area=current_area,
-                    pressure="keras",
+                    area=current_area, pressure="keras",
                     scene_num=self.back_scene_count + 1,
                     elapsed_minutes=self._get_area_elapsed() // 60
                 )
@@ -725,19 +609,14 @@ class TherapistFlow:
                 self.character.tracker.current_pressure = "lembut"
                 self.character.emotional.add_stimulation("Mas minta tekanan lembut", 1)
                 self.waiting_for_response = False
-                
                 return await self._generate_back_scene(
-                    area=current_area,
-                    pressure="lembut",
+                    area=current_area, pressure="lembut",
                     scene_num=self.back_scene_count + 1,
                     elapsed_minutes=self._get_area_elapsed() // 60
                 )
-            
             else:
-                # Respon tidak dikenali, ulang pertanyaan
                 return self._build_confirmation_pressure()
         
-        # ========== KONFIRMASI PINDAH AREA ==========
         elif self.waiting_for_type == "next_area":
             if any(k in msg_lower for k in ["lanjut", "ya", "ok", "gas", "iya", "y", "lanjutin", "next"]):
                 logger.info(f"Mas konfirmasi lanjut ke area berikutnya")
@@ -761,7 +640,6 @@ class TherapistFlow:
     # =========================================================================
     
     async def _start_front_massage(self) -> str:
-        """Mulai pijat depan - duduk di kontol Mas"""
         self.current_phase = ServicePhase.FRONT_DADA_LENGAN
         self.phase_start_time = time.time()
         self.front_area_start_time = time.time()
@@ -769,7 +647,6 @@ class TherapistFlow:
         self.front_scene_count = 0
         self.front_confirm_count = 0
     
-        # Set posisi
         self.character.tracker.position = "duduk di atas kontol Mas"
         self.character.tracker.service_phase = ServicePhase.FRONT_DADA_LENGAN
     
@@ -778,7 +655,6 @@ class TherapistFlow:
             "Duduk di atas kontol Mas, siap gesek"
         )
 
-        # Kirim pesan balik badan
         balik_badan_msg = f"""*{self.character.name} berhenti memijat, mengusap keringat di dahi*
 
 "Mas... bagian belakang udah selesai. Sekarang giliran depan ya..."
@@ -791,7 +667,6 @@ class TherapistFlow:
 
 "Aku mulai dari dada dulu ya..." """
     
-        # Generate scene pertama pijat depan
         front_scene = await self._generate_front_scene(
             area="dada_lengan",
             pressure=self._get_current_pressure(),
@@ -799,11 +674,9 @@ class TherapistFlow:
             elapsed_minutes=0
         )
     
-        # KIRIM KEDUANYA
         return balik_badan_msg + "\n\n" + front_scene
     
     async def _next_front_area(self) -> str:
-        """Pindah ke area berikutnya dalam pijat depan"""
         self.front_area_index += 1
         self.front_area_start_time = time.time()
         self.front_scene_count = 0
@@ -813,13 +686,11 @@ class TherapistFlow:
         logger.info(f"Front area index: {self.front_area_index}, total areas: {len(self.front_areas)}")
         
         if self.front_area_index >= len(self.front_areas):
-            # Selesai semua area pijat depan, tawarkan HJ
             logger.info("✅ ALL FRONT AREAS COMPLETED! Offering handjob...")
             return await self._offer_handjob()
         
         current_area = self.front_areas[self.front_area_index]
         
-        # Update phase
         if current_area == "perut_paha":
             self.current_phase = ServicePhase.FRONT_PERUT_PAHA
             self.character.tracker.service_phase = ServicePhase.FRONT_PERUT_PAHA
@@ -827,12 +698,8 @@ class TherapistFlow:
             self.current_phase = ServicePhase.FRONT_GESEKAN
             self.character.tracker.service_phase = ServicePhase.FRONT_GESEKAN
         
-        self.character.tracker.add_to_timeline(
-            f"Pindah ke area {current_area}",
-            "Lanjut pijat depan"
-        )
+        self.character.tracker.add_to_timeline(f"Pindah ke area {current_area}", "Lanjut pijat depan")
         
-        # Generate scene pertama area baru
         return await self._generate_front_scene(
             area=current_area,
             pressure=self._get_current_pressure(),
@@ -845,35 +712,32 @@ class TherapistFlow:
     # =========================================================================
     
     async def _process_front_massage(self, pesan_mas: str) -> Optional[str]:
-        """
-        Process pesan Mas dalam fase pijat depan
-        Returns: response atau None jika perlu auto-send scene
-        """
         current_area = self.front_areas[self.front_area_index]
         elapsed = self._get_area_elapsed()
         elapsed_minutes = elapsed // 60
         
-        # ========== CEK JIKA SEDANG MENUNGGU RESPON ==========
-        if self.waiting_for_response:
-            if pesan_mas and pesan_mas.strip():
-                return await self._handle_front_confirmation(pesan_mas, current_area)
-            return None
-        
-        # ========== CEK APAKAH AREA SUDAH SELESAI (10 MENIT) ==========
+        # CEK AREA COMPLETE DULU (PRIORITAS TERTINGGI)
         if self._is_area_complete():
+            logger.info(f"Front area {current_area} COMPLETE! elapsed={elapsed}")
             self.waiting_for_response = True
             self.waiting_for_type = "next_area"
             self.waiting_start_time = time.time()
             return self._build_confirmation_next_area(current_area)
         
-        # ========== CEK APAKAH PERLU KONFIRMASI (SETIAP 3 MENIT) ==========
+        # CEK JIKA SEDANG MENUNGGU RESPON
+        if self.waiting_for_response:
+            if pesan_mas and pesan_mas.strip():
+                return await self._handle_front_confirmation(pesan_mas, current_area)
+            return None
+        
+        # CEK KONFIRMASI TEKANAN
         if self._should_ask_confirmation():
             self.waiting_for_response = True
             self.waiting_for_type = "pressure"
             self.waiting_start_time = time.time()
             return self._build_confirmation_pressure()
         
-        # ========== CEK APAKAH PERLU KIRIM SCENE BERIKUTNYA (SETIAP 30 DETIK) ==========
+        # CEK KIRIM SCENE BERIKUTNYA
         if self._should_send_next_scene():
             scene_num = self.front_scene_count
             return await self._generate_front_scene(
@@ -886,20 +750,16 @@ class TherapistFlow:
         return None
     
     async def _handle_front_confirmation(self, pesan_mas: str, current_area: str) -> str:
-        """Handle konfirmasi dari Mas selama pijat depan"""
         msg_lower = pesan_mas.lower()
         
-        # ========== KONFIRMASI TEKANAN ==========
         if self.waiting_for_type == "pressure":
             if any(k in msg_lower for k in ["keras", "kuat", "hard"]):
                 self.character.tracker.save_mas_preference('preferred_pressure', 'keras')
                 self.character.tracker.current_pressure = "keras"
                 self.character.emotional.add_stimulation("Mas minta tekanan keras", 3)
                 self.waiting_for_response = False
-                
                 return await self._generate_front_scene(
-                    area=current_area,
-                    pressure="keras",
+                    area=current_area, pressure="keras",
                     scene_num=self.front_scene_count + 1,
                     elapsed_minutes=self._get_area_elapsed() // 60
                 )
@@ -909,18 +769,14 @@ class TherapistFlow:
                 self.character.tracker.current_pressure = "lembut"
                 self.character.emotional.add_stimulation("Mas minta tekanan lembut", 1)
                 self.waiting_for_response = False
-                
                 return await self._generate_front_scene(
-                    area=current_area,
-                    pressure="lembut",
+                    area=current_area, pressure="lembut",
                     scene_num=self.front_scene_count + 1,
                     elapsed_minutes=self._get_area_elapsed() // 60
                 )
-            
             else:
                 return self._build_confirmation_pressure()
         
-        # ========== KONFIRMASI PINDAH AREA ==========
         elif self.waiting_for_type == "next_area":
             if any(k in msg_lower for k in ["lanjut", "ya", "ok", "gas", "iya"]):
                 self.waiting_for_response = False
@@ -940,27 +796,20 @@ class TherapistFlow:
     # =========================================================================
     
     async def _offer_handjob(self) -> str:
-        """Tawarkan handjob setelah pijat depan selesai"""
         logger.info("🔥 OFFERING HANDJOB - Pijat depan selesai!")
         logger.info(f"   Total front scenes sent: {self.front_scene_count}")
         logger.info(f"   Mas climax this session: {self.mas_climax_this_session}")
-        logger.info(f"   Role climax this session: {self.role_climax_this_session}")
         
         self.waiting_for_response = True
         self.waiting_for_type = "hj_offer"
         self.waiting_start_time = time.time()
         
-        self.character.tracker.add_to_timeline(
-            "Menawarkan handjob ke Mas",
-            "Pijat depan selesai"
-        )
-
+        self.character.tracker.add_to_timeline("Menawarkan handjob ke Mas", "Pijat depan selesai")
         hj_offer_msg = self._build_hj_offer()
         logger.info("📤 HJ offer message sent, waiting for Mas response...")
         return hj_offer_msg
     
     def _build_hj_offer(self) -> str:
-        """Bangun pesan tawaran handjob"""
         return f"""*{self.character.name} duduk di samping Mas, napas masih sedikit berat. Dressnya masih terbuka, payudaranya terlihat jelas di samping.*
 
 "{self.character.panggilan}... pijatannya udah selesai."
@@ -976,30 +825,24 @@ class TherapistFlow:
 *Menunggu jawaban Mas...*"""
 
     async def _handle_hj_offer(self, pesan_mas: str) -> Optional[str]:
-        """Handle tawaran handjob dari Mas"""
         msg_lower = pesan_mas.lower()
-    
         logger.info(f"📨 Handling HJ offer response: {pesan_mas[:50]}")
     
-        # Mas setuju
         if any(k in msg_lower for k in ["ya", "ok", "gas", "lanjut", "deal", "y", "siap"]):
             logger.info("✅ Mas ACCEPTED handjob offer! Starting HJ...")
             self.waiting_for_response = False
             return await self._start_handjob()
     
-        # Mas tolak
         elif any(k in msg_lower for k in ["tidak", "nggak", "gak", "stop", "cukup", "selesai"]):
             logger.info("❌ Mas DECLINED handjob offer. Ending session...")
             self.waiting_for_response = False
             return self._build_end_session()
     
-        # Respon tidak dikenali, ulang tawaran
         else:
             logger.info(f"⚠️ Unrecognized response: {pesan_mas}. Repeating offer...")
             return self._build_hj_offer()
     
     async def _start_handjob(self) -> str:
-        """Mulai handjob - duduk di samping Mas"""
         logger.info("🔥🔥🔥 STARTING HANDJOB! 🔥🔥🔥")
         logger.info(f"   HJ total scenes: {self.HJ_SCENES}")
         logger.info(f"   Scene interval: {self.SCENE_INTERVAL} detik")
@@ -1012,7 +855,6 @@ class TherapistFlow:
         self.hj_active = True
         self.waiting_for_response = False
         
-        # Set posisi
         self.character.tracker.position = "duduk di samping Mas"
         self.character.tracker.service_phase = ServicePhase.HANDJOB
         self.character.tracker.current_speed = "medium"
@@ -1023,317 +865,22 @@ class TherapistFlow:
         )
 
         logger.info("✅ Handjob started, generating first scene...")
-        
-        # Generate scene pertama
-        return await self._generate_hj_scene(
-            scene_num=1,
-            speed="medium",
-            mas_action=None
-        )
+        return await self._generate_hj_scene(scene_num=1, speed="medium", mas_action=None)
     
     # =========================================================================
     # HANDJOB - PROCESS
     # =========================================================================
     
     async def _process_handjob(self, pesan_mas: str) -> Optional[str]:
-        """
-        Process pesan Mas dalam fase handjob
-        Returns: response atau None jika perlu auto-send scene
-        """
         elapsed = self._get_area_elapsed()
         
-        # ========== CEK JIKA SEDANG MENUNGGU RESPON ==========
+        # CEK JIKA SEDANG MENUNGGU RESPON
         if self.waiting_for_response:
             if pesan_mas and pesan_mas.strip():
                 return await self._handle_hj_response(pesan_mas)
             return None
         
-        # ========== CEK CLIMAX WARNING ==========
-        if self.character.emotional.arousal >= 85 and not self.waiting_climax_confirmation:
-            self.waiting_climax_confirmation = True
-            self.climax_warning_time = time.time()
-            return self._build_climax_warning()
-        
-        if self.waiting_climax_confirmation:
-            if pesan_mas and pesan_mas.strip():
-                return await self._handle_climax_confirmation(pesan_mas)
-            # Timeout 15 detik, climax aja
-            if time.time() - self.climax_warning_time > 15:
-                self.waiting_climax_confirmation = False
-                self.role_climax_this_session += 1
-                result = self.character.emotional.climax(is_heavy=False)
-                self.character.tracker.record_my_climax()
-                return self._build_climax_scene(is_mas=False, intensity="normal")
-            return None
-        
-        # ========== CEK APAKAH HJ SELESAI (30 MENIT) ==========
-        if self.hj_scene_count >= self.hj_total_scenes:
-            return await self._offer_extra_service()
-        
-        # ========== CEK APAKAH PERLU KIRIM SCENE BERIKUTNYA (SETIAP 30 DETIK) ==========
-        if self._should_send_next_scene():
-            scene_num = self.hj_scene_count
-            speed = self._get_current_speed()
-            
-            # Update arousal dari gesekan
-            if scene_num % 5 == 0:  # setiap 5 scene, arousal naik
-                self.character.emotional.add_stimulation("HJ berlangsung", 2)
-            
-            return await self._generate_hj_scene(
-                scene_num=scene_num,
-                speed=speed,
-                mas_action=None
-            )
-        
-        return None
-    
-    async def _handle_hj_response(self, pesan_mas: str) -> str:
-        """Handle respon Mas selama handjob"""
-        msg_lower = pesan_mas.lower()
-        
-        # ========== MAS MINTA KECEPATAN ==========
-        if any(k in msg_lower for k in ["cepat", "kenceng", "harder", "faster"]):
-            self.character.tracker.save_mas_preference('preferred_speed', 'cepat')
-            self.character.tracker.current_speed = "fast"
-            self.character.emotional.add_stimulation("Mas minta cepat", 3)
-            self.waiting_for_response = False
-            
-            return await self._generate_hj_scene(
-                scene_num=self.hj_scene_count + 1,
-                speed="fast",
-                mas_action="Mas minta cepat"
-            )
-        
-        elif any(k in msg_lower for k in ["pelan", "lambat", "slow"]):
-            self.character.tracker.save_mas_preference('preferred_speed', 'pelan')
-            self.character.tracker.current_speed = "slow"
-            self.character.emotional.add_stimulation("Mas minta pelan", 1)
-            self.waiting_for_response = False
-            
-            return await self._generate_hj_scene(
-                scene_num=self.hj_scene_count + 1,
-                speed="slow",
-                mas_action="Mas minta pelan"
-            )
-        
-        # ========== MAS PEGANG/REMAS/ELUS ==========
-        if any(k in msg_lower for k in ["pegang", "remas", "elus", "sentuh"]):
-            action = ""
-            if "paha" in msg_lower:
-                action = "pegang paha"
-                self.character.emotional.add_stimulation_from_mas("pegang paha")
-            elif "toket" in msg_lower or "payudara" in msg_lower or "dada" in msg_lower:
-                action = "remas toket"
-                self.character.emotional.add_stimulation_from_mas("remas toket", 4)
-                self.character.tracker.add_to_timeline("Mas remas toket", f"ke-{self.character.tracker.stimulation_count}")
-            else:
-                action = "pegang"
-                self.character.emotional.add_stimulation_from_mas("pegang", 2)
-            
-            self.waiting_for_response = False
-            
-            return await self._generate_hj_scene(
-                scene_num=self.hj_scene_count + 1,
-                speed=self._get_current_speed(),
-                mas_action=action
-            )
-        
-        # Respon lain, lanjutkan HJ
-        self.waiting_for_response = False
-        return None
-    
-    async def _handle_climax_confirmation(self, pesan_mas: str) -> str:
-        """Handle konfirmasi climax dari Mas"""
-        msg_lower = pesan_mas.lower()
-        
-        if any(k in msg_lower for k in ["ya", "ok", "boleh", "gas", "ayo"]):
-            self.waiting_climax_confirmation = False
-            self.role_climax_this_session += 1
-            result = self.character.emotional.climax(is_heavy=False)
-            self.character.tracker.record_my_climax()
-            return self._build_climax_scene(is_mas=False, intensity="normal")
-        
-        elif any(k in msg_lower for k in ["tahan", "jangan", "nanti"]):
-            self.waiting_climax_confirmation = False
-            self.character.emotional.arousal = max(0, self.character.emotional.arousal - 20)
-            return f"*{self.character.name} menahan napas, tubuh masih bergerak*\n\n\"Aku tahan... ayo Mas...\""
-        
-        else:
-            # Default: climax aja
-            self.waiting_climax_confirmation = False
-            self.role_climax_this_session += 1
-            result = self.character.emotional.climax(is_heavy=False)
-            self.character.tracker.record_my_climax()
-            return self._build_climax_scene(is_mas=False, intensity="normal")
-
-
-    # =========================================================================
-    # EXTRA SERVICE - OFFER & NEGOSIASI
-    # =========================================================================
-    
-    async def _offer_extra_service(self) -> str:
-        """Tawarkan extra service (BJ/Sex) setelah HJ"""
-        logger.info("🔥 OFFERING EXTRA SERVICE (BJ/SEX) - HJ selesai!")
-        logger.info(f"   HJ total scenes sent: {self.hj_scene_count}")
-        logger.info(f"   HJ duration: {self.hj_scene_count * self.SCENE_INTERVAL // 60} menit")
-        logger.info(f"   Mas climax this session: {self.mas_climax_this_session}")
-    
-        self.waiting_for_response = True
-        self.waiting_for_type = "extra_offer"
-        self.waiting_start_time = time.time()
-    
-        self.character.tracker.add_to_timeline(
-            "Menawarkan extra service",
-            "HJ selesai"
-        )
-    
-        extra_offer_msg = self._build_extra_offer()
-        logger.info("📤 Extra service offer message sent, waiting for Mas response...")
-    
-        return extra_offer_msg
-
-
-    async def _handle_extra_offer(self, pesan_mas: str) -> Optional[str]:
-        """Handle tawaran extra service dari Mas"""
-        msg_lower = pesan_mas.lower()
-    
-        logger.info(f"📨 Handling extra offer response: {pesan_mas[:50]}")
-    
-        # Pilih BJ
-        if 'bj' in msg_lower or 'blow' in msg_lower:
-            logger.info("✅ Mas memilih BLOWJOB! Starting negotiation...")
-            self.negotiation_service = "bj"
-            self.negotiation_price = self.PRICE_BJ
-            self.negotiation_step = 0
-            self.negotiation_active = True
-            self.waiting_for_type = "negotiation"
-            return self._build_deal_offer("bj", self.PRICE_BJ)
-    
-        # Pilih Sex
-        if 'sex' in msg_lower or 'eksekusi' in msg_lower:
-            logger.info("✅ Mas memilih SEX! Starting negotiation...")
-            self.negotiation_service = "sex"
-            self.negotiation_price = self.PRICE_SEX
-            self.negotiation_step = 0
-            self.negotiation_active = True
-            self.waiting_for_type = "negotiation"
-            return self._build_deal_offer("sex", self.PRICE_SEX)
-    
-        # Tolak
-        if any(k in msg_lower for k in ["tidak", "nggak", "gak", "cukup", "stop"]):
-            logger.info("❌ Mas Menolak Extra Service. Sesi Pijat Selesai...")
-            self.waiting_for_response = False
-            return self._build_end_session()
-    
-        # Ulang tawaran
-        logger.info("⚠️ Unrecognized response, repeating offer...")
-        return self._build_extra_offer()
-    
-    async def _handle_negotiation(self, pesan_mas: str) -> Optional[str]:
-        """Handle negosiasi harga"""
-        msg_lower = pesan_mas.lower()
-
-        logger.info(f"📨 Handling negotiation: {pesan_mas[:50]}, service: {self.negotiation_service}")
-        
-        # Deal
-        if any(k in msg_lower for k in ["deal", "ok", "ya", "setuju", "gas"]):
-            logger.info(f"✅ DEAL CONFIRMED! Service: {self.negotiation_service}, Price: Rp{self.negotiation_price:,}")
-            self.deal_confirmed = True
-            self.negotiation_active = False
-            self.waiting_for_response = False
-            
-            if self.negotiation_service == "bj":
-                return await self._start_bj()
-            else:
-                return await self._start_sex()
-        
-        # Nego
-        if any(k in msg_lower for k in ["nego", "kurang", "murah"]):
-            logger.info(f"💰 Negotiation step {self.negotiation_step}/{self.negotiation_max_step}")
-            self.negotiation_step += 1
-            
-            if self.negotiation_step > self.negotiation_max_step:
-                logger.warning("❌ Negotiation BATAL (SEMUA SESI SELESAI)")
-                self.negotiation_active = False
-                return self._build_nego_failed()
-            
-            if self.negotiation_service == "bj":
-                new_price = max(self.PRICE_BJ_DEAL, self.PRICE_BJ - (50000 * self.negotiation_step))
-                self.negotiation_price = new_price
-                logger.info(f"💰 Counter offer BJ: Rp{new_price:,}")
-                return self._build_nego_counter(new_price)
-            else:
-                new_price = max(self.PRICE_SEX_DEAL, self.PRICE_SEX - (50000 * self.negotiation_step))
-                self.negotiation_price = new_price
-                logger.info(f"💰 Counter offer Sex: Rp{new_price:,}")
-                return self._build_nego_counter(new_price)
-        
-        # Batal
-        if any(k in msg_lower for k in ["batal", "gak jadi", "cancel"]):
-            logger.info("❌ Negotiation cancelled by Mas")
-            self.negotiation_active = False
-            self.waiting_for_response = False
-            return self._build_end_session()
-        
-        # Ulang tawaran
-        logger.info("⚠️ Unrecognized negotiation response, repeating offer...")
-        return self._build_deal_offer(self.negotiation_service, self.negotiation_price)
-    
-    # =========================================================================
-    # BLOWJOB - START & PROCESS
-    # =========================================================================
-    
-    async def _start_bj(self) -> str:
-        """Mulai blowjob"""
-        logger.info("🔥🔥🔥 STARTING BLOWJOB! 🔥🔥🔥")
-        logger.info(f"   BJ total scenes: {self.BJ_SCENES}")
-        logger.info(f"   Scene interval: {self.SCENE_INTERVAL} detik")
-        logger.info(f"   Total duration: {self.BJ_SCENES * self.SCENE_INTERVAL // 60} menit")
-        logger.info(f"   Deal price: Rp{self.negotiation_price:,}")
-    
-        self.current_phase = ServicePhase.BJ
-        self.phase_start_time = time.time()
-        self.bj_scene_count = 0
-        self.bj_total_scenes = self.BJ_SCENES
-        self.bj_active = True
-        self.waiting_for_response = False
-        
-        # Set posisi
-        self.character.tracker.position = "berlutut di antara kaki Mas"
-        self.character.tracker.service_phase = ServicePhase.BJ
-        
-        # Buka bra
-        if self.character.tracker.clothing['bra']['on']:
-            self.character.tracker.remove_clothing('bra', "sendiri")
-        
-        self.character.tracker.add_to_timeline(
-            "Memulai blowjob",
-            f"Total scene: {self.bj_total_scenes}, 30 detik per scene, harga: Rp{self.negotiation_price:,}"
-        )
-
-        logger.info("✅ Blowjob started, generating first scene...")
-        
-        # Generate scene pertama
-        return await self._generate_bj_scene(
-            scene_num=1,
-            depth="medium",
-            mas_action=None
-        )
-    
-    async def _process_bj(self, pesan_mas: str) -> Optional[str]:
-        """
-        Process pesan Mas dalam fase blowjob
-        Returns: response atau None jika perlu auto-send scene
-        """
-        elapsed = self._get_area_elapsed()
-        
-        # ========== CEK JIKA SEDANG MENUNGGU RESPON ==========
-        if self.waiting_for_response:
-            if pesan_mas and pesan_mas.strip():
-                return await self._handle_bj_response(pesan_mas)
-            return None
-        
-        # ========== CEK CLIMAX WARNING ==========
+        # CEK CLIMAX WARNING
         if self.character.emotional.arousal >= 85 and not self.waiting_climax_confirmation:
             self.waiting_climax_confirmation = True
             self.climax_warning_time = time.time()
@@ -1350,170 +897,394 @@ class TherapistFlow:
                 return self._build_climax_scene(is_mas=False, intensity="normal")
             return None
         
-        # ========== CEK APAKAH BJ SELESAI (30 MENIT) ==========
-        if self.bj_scene_count >= self.bj_total_scenes:
+        # CEK APAKAH HJ SELESAI (30 MENIT)
+        if self.hj_scene_count >= self.hj_total_scenes:
+            logger.info("✅ HJ COMPLETED! Offering extra service...")
+            return await self._offer_extra_service()
+        
+        # CEK KIRIM SCENE BERIKUTNYA
+        if self._should_send_next_scene():
+            scene_num = self.hj_scene_count
+            speed = self._get_current_speed()
+            
+            if scene_num % 5 == 0:
+                self.character.emotional.add_stimulation("HJ berlangsung", 2)
+            
+            return await self._generate_hj_scene(scene_num=scene_num, speed=speed, mas_action=None)
+        
+        return None
+    
+    async def _handle_hj_response(self, pesan_mas: str) -> str:
+        msg_lower = pesan_mas.lower()
+        
+        # MAS MINTA KECEPATAN
+        if any(k in msg_lower for k in ["cepat", "kenceng", "harder", "faster"]):
+            self.character.tracker.save_mas_preference('preferred_speed', 'cepat')
+            self.character.tracker.current_speed = "fast"
+            self.character.emotional.add_stimulation("Mas minta cepat", 3)
+            self.waiting_for_response = False
+            return await self._generate_hj_scene(
+                scene_num=self.hj_scene_count + 1, speed="fast", mas_action="Mas minta cepat"
+            )
+        
+        elif any(k in msg_lower for k in ["pelan", "lambat", "slow"]):
+            self.character.tracker.save_mas_preference('preferred_speed', 'pelan')
+            self.character.tracker.current_speed = "slow"
+            self.character.emotional.add_stimulation("Mas minta pelan", 1)
+            self.waiting_for_response = False
+            return await self._generate_hj_scene(
+                scene_num=self.hj_scene_count + 1, speed="slow", mas_action="Mas minta pelan"
+            )
+        
+        # MAS PEGANG/REMAS/ELUS
+        if any(k in msg_lower for k in ["pegang", "remas", "elus", "sentuh"]):
+            action = ""
+            if "paha" in msg_lower:
+                action = "pegang paha"
+                self.character.emotional.add_stimulation_from_mas("pegang paha")
+            elif "toket" in msg_lower or "payudara" in msg_lower or "dada" in msg_lower:
+                action = "remas toket"
+                self.character.emotional.add_stimulation_from_mas("remas toket", 4)
+                self.character.tracker.add_to_timeline("Mas remas toket", f"ke-{self.character.tracker.stimulation_count}")
+            else:
+                action = "pegang"
+                self.character.emotional.add_stimulation_from_mas("pegang", 2)
+            
+            self.waiting_for_response = False
+            return await self._generate_hj_scene(
+                scene_num=self.hj_scene_count + 1,
+                speed=self._get_current_speed(),
+                mas_action=action
+            )
+        
+        self.waiting_for_response = False
+        return None
+    
+    async def _handle_climax_confirmation(self, pesan_mas: str) -> str:
+        msg_lower = pesan_mas.lower()
+        
+        if any(k in msg_lower for k in ["ya", "ok", "boleh", "gas", "ayo"]):
+            self.waiting_climax_confirmation = False
+            self.role_climax_this_session += 1
+            self.character.emotional.climax(is_heavy=False)
+            self.character.tracker.record_my_climax()
+            return self._build_climax_scene(is_mas=False, intensity="normal")
+        
+        elif any(k in msg_lower for k in ["tahan", "jangan", "nanti"]):
+            self.waiting_climax_confirmation = False
+            self.character.emotional.arousal = max(0, self.character.emotional.arousal - 20)
+            return f"*{self.character.name} menahan napas, tubuh masih bergerak*\n\n\"Aku tahan... ayo Mas...\""
+        
+        else:
+            self.waiting_climax_confirmation = False
+            self.role_climax_this_session += 1
+            self.character.emotional.climax(is_heavy=False)
+            self.character.tracker.record_my_climax()
+            return self._build_climax_scene(is_mas=False, intensity="normal")
+
+
+    # =========================================================================
+    # EXTRA SERVICE - OFFER & NEGOSIASI
+    # =========================================================================
+    
+    async def _offer_extra_service(self) -> str:
+        logger.info("🔥 OFFERING EXTRA SERVICE (BJ/SEX) - HJ selesai!")
+        logger.info(f"   HJ total scenes sent: {self.hj_scene_count}")
+        logger.info(f"   HJ duration: {self.hj_scene_count * self.SCENE_INTERVAL // 60} menit")
+        logger.info(f"   Mas climax this session: {self.mas_climax_this_session}")
+    
+        self.waiting_for_response = True
+        self.waiting_for_type = "extra_offer"
+        self.waiting_start_time = time.time()
+    
+        self.character.tracker.add_to_timeline("Menawarkan extra service", "HJ selesai")
+        extra_offer_msg = self._build_extra_offer()
+        logger.info("📤 Extra service offer message sent, waiting for Mas response...")
+        return extra_offer_msg
+
+    def _build_extra_offer(self) -> str:
+        return f"""*{self.character.name} berhenti, napasnya masih tersengal. Dressnya sudah terbuka, tubuhnya masih hangat.*
+
+"{self.character.panggilan}... mau lanjut ke extra service?"
+
+*Dia menjilat bibir, matanya sayu*
+
+"Ada BJ 30 menit Rp{self.PRICE_BJ:,}, atau sex tanpa batasan waktu sampe Mas puas 2x Rp{self.PRICE_SEX:,}..."
+
+*Tangannya mulai meraba paha Mas*
+
+"Bisa nego kok Mas... special buat Mas..."
+
+*Menunggu jawaban Mas...*"""
+    
+    async def _handle_extra_offer(self, pesan_mas: str) -> Optional[str]:
+        msg_lower = pesan_mas.lower()
+        logger.info(f"📨 Handling extra offer response: {pesan_mas[:50]}")
+    
+        if 'bj' in msg_lower or 'blow' in msg_lower:
+            logger.info("✅ Mas memilih BLOWJOB! Starting negotiation...")
+            self.negotiation_service = "bj"
+            self.negotiation_price = self.PRICE_BJ
+            self.negotiation_step = 0
+            self.negotiation_active = True
+            self.waiting_for_type = "negotiation"
+            return self._build_deal_offer("bj", self.PRICE_BJ)
+    
+        if 'sex' in msg_lower or 'eksekusi' in msg_lower:
+            logger.info("✅ Mas memilih SEX! Starting negotiation...")
+            self.negotiation_service = "sex"
+            self.negotiation_price = self.PRICE_SEX
+            self.negotiation_step = 0
+            self.negotiation_active = True
+            self.waiting_for_type = "negotiation"
+            return self._build_deal_offer("sex", self.PRICE_SEX)
+    
+        if any(k in msg_lower for k in ["tidak", "nggak", "gak", "cukup", "stop"]):
+            logger.info("❌ Mas Menolak Extra Service. Sesi Pijat Selesai...")
+            self.waiting_for_response = False
+            return self._build_end_session()
+    
+        logger.info("⚠️ Unrecognized response, repeating offer...")
+        return self._build_extra_offer()
+    
+    async def _handle_negotiation(self, pesan_mas: str) -> Optional[str]:
+        msg_lower = pesan_mas.lower()
+        logger.info(f"📨 Handling negotiation: {pesan_mas[:50]}, service: {self.negotiation_service}")
+        
+        # DEAL
+        if any(k in msg_lower for k in ["deal", "ok", "ya", "setuju", "gas"]):
+            logger.info(f"✅ DEAL CONFIRMED! Service: {self.negotiation_service}, Price: Rp{self.negotiation_price:,}")
+            self.deal_confirmed = True
+            self.negotiation_active = False
+            self.waiting_for_response = False
+            
+            if self.negotiation_service == "bj":
+                return await self._start_bj()
+            else:
+                return await self._start_sex()
+        
+        # NEGO
+        if any(k in msg_lower for k in ["nego", "kurang", "murah"]):
+            logger.info(f"💰 Negotiation step {self.negotiation_step}/{self.negotiation_max_step}")
+            self.negotiation_step += 1
+            
+            if self.negotiation_step > self.negotiation_max_step:
+                logger.warning("❌ Negotiation failed")
+                self.negotiation_active = False
+                return self._build_nego_failed()
+            
+            if self.negotiation_service == "bj":
+                new_price = max(self.PRICE_BJ_DEAL, self.PRICE_BJ - (50000 * self.negotiation_step))
+                self.negotiation_price = new_price
+                logger.info(f"💰 Counter offer BJ: Rp{new_price:,}")
+                return self._build_nego_counter(new_price)
+            else:
+                new_price = max(self.PRICE_SEX_DEAL, self.PRICE_SEX - (50000 * self.negotiation_step))
+                self.negotiation_price = new_price
+                logger.info(f"💰 Counter offer Sex: Rp{new_price:,}")
+                return self._build_nego_counter(new_price)
+        
+        # BATAL
+        if any(k in msg_lower for k in ["batal", "gak jadi", "cancel"]):
+            logger.info("❌ Negotiation cancelled by Mas")
+            self.negotiation_active = False
+            self.waiting_for_response = False
             return self._build_end_session()
         
-        # ========== CEK APAKAH PERLU KIRIM SCENE BERIKUTNYA (SETIAP 30 DETIK) ==========
+        logger.info("⚠️ Unrecognized negotiation response, repeating offer...")
+        return self._build_deal_offer(self.negotiation_service, self.negotiation_price)
+    
+    # =========================================================================
+    # BLOWJOB (AUTO-SEND) - SELESAI SETELAH MAS CLIMAX
+    # =========================================================================
+    
+    async def _start_bj(self) -> str:
+        logger.info("🔥🔥🔥 STARTING BLOWJOB! 🔥🔥🔥")
+        logger.info(f"   BJ total scenes: {self.BJ_SCENES}")
+        logger.info(f"   Deal price: Rp{self.negotiation_price:,}")
+    
+        self.current_phase = ServicePhase.BJ
+        self.phase_start_time = time.time()
+        self.bj_scene_count = 0
+        self.bj_total_scenes = self.BJ_SCENES
+        self.bj_active = True
+        self.waiting_for_response = False
+        
+        self.character.tracker.position = "berlutut di antara kaki Mas"
+        self.character.tracker.service_phase = ServicePhase.BJ
+        
+        if self.character.tracker.clothing['bra']['on']:
+            self.character.tracker.remove_clothing('bra', "sendiri")
+        
+        self.character.tracker.add_to_timeline(
+            "Memulai blowjob",
+            f"Total scene: {self.bj_total_scenes}, 30 detik per scene, harga: Rp{self.negotiation_price:,}"
+        )
+
+        logger.info("✅ Blowjob started, generating first scene...")
+        return await self._generate_bj_scene(scene_num=1, depth="medium", mas_action=None)
+    
+    async def _process_bj(self, pesan_mas: str) -> Optional[str]:
+        elapsed = self._get_area_elapsed()
+        
+        if self.waiting_for_response:
+            if pesan_mas and pesan_mas.strip():
+                return await self._handle_bj_response(pesan_mas)
+            return None
+        
+        # CEK CLIMAX WARNING
+        if self.character.emotional.arousal >= 85 and not self.waiting_climax_confirmation:
+            self.waiting_climax_confirmation = True
+            self.climax_warning_time = time.time()
+            return self._build_climax_warning()
+        
+        if self.waiting_climax_confirmation:
+            if pesan_mas and pesan_mas.strip():
+                return await self._handle_climax_confirmation(pesan_mas)
+            if time.time() - self.climax_warning_time > 15:
+                self.waiting_climax_confirmation = False
+                self.role_climax_this_session += 1
+                self.character.emotional.climax(is_heavy=False)
+                self.character.tracker.record_my_climax()
+                return self._build_climax_scene(is_mas=False, intensity="normal")
+            return None
+        
+        # CEK APAKAH MAS CLIMAX (SELESAIKAN BJ)
+        if self.mas_climax_this_session > 0:
+            logger.info("✅ Mas climax achieved! Ending BJ session...")
+            return self._build_end_session()
+        
+        # CEK KIRIM SCENE BERIKUTNYA
         if self._should_send_next_scene():
             scene_num = self.bj_scene_count
             depth = "deep" if scene_num > self.bj_total_scenes * 0.7 else "medium"
             
-            # Update arousal
             if scene_num % 5 == 0:
                 self.character.emotional.add_stimulation("BJ berlangsung", 3)
             
-            return await self._generate_bj_scene(
-                scene_num=scene_num,
-                depth=depth,
-                mas_action=None
-            )
+            return await self._generate_bj_scene(scene_num=scene_num, depth=depth, mas_action=None)
         
         return None
     
     async def _handle_bj_response(self, pesan_mas: str) -> str:
-        """Handle respon Mas selama blowjob"""
         msg_lower = pesan_mas.lower()
         
-        # Mas pegang kepala/rambut
         if any(k in msg_lower for k in ["pegang", "tarik", "rambut", "kepala"]):
             self.character.emotional.add_stimulation_from_mas("Mas pegang kepala", 4)
             self.waiting_for_response = False
-            
             return await self._generate_bj_scene(
-                scene_num=self.bj_scene_count + 1,
-                depth="deep",
-                mas_action="Mas pegang kepala"
+                scene_num=self.bj_scene_count + 1, depth="deep", mas_action="Mas pegang kepala"
             )
         
-        # Mas minta lebih dalam
         if any(k in msg_lower for k in ["dalam", "deep", "sampe pangkal"]):
             self.character.emotional.add_stimulation_from_mas("Mas minta lebih dalam", 3)
             self.waiting_for_response = False
-            
             return await self._generate_bj_scene(
-                scene_num=self.bj_scene_count + 1,
-                depth="deep",
-                mas_action="Mas minta lebih dalam"
+                scene_num=self.bj_scene_count + 1, depth="deep", mas_action="Mas minta lebih dalam"
             )
         
-        # Mas minta cepat
         if any(k in msg_lower for k in ["cepat", "kenceng"]):
             self.character.emotional.add_stimulation_from_mas("Mas minta cepat", 2)
             self.waiting_for_response = False
-            
             return await self._generate_bj_scene(
-                scene_num=self.bj_scene_count + 1,
-                depth="medium",
-                mas_action="Mas minta cepat"
+                scene_num=self.bj_scene_count + 1, depth="medium", mas_action="Mas minta cepat"
             )
         
         self.waiting_for_response = False
         return None
 
     # =========================================================================
-    # SEX - START & PROCESS
+    # SEX (MANUAL MODE) - BERBALAS PESAN, SELESAI SETELAH MAS CLIMAX 2x
     # =========================================================================
     
     async def _start_sex(self) -> str:
-        """Mulai sex"""
-        logger.info("🔥🔥🔥 STARTING SEX! 🔥🔥🔥")
-        logger.info(f"   Sex total scenes: {self.sex_total_scenes} (random between {self.SEX_SCENES_MIN}-{self.SEX_SCENES_MAX})")
-        logger.info(f"   Scene interval: {self.SCENE_INTERVAL} detik")
-        logger.info(f"   Estimated duration: {self.sex_total_scenes * self.SCENE_INTERVAL // 60} menit")
+        logger.info("🔥🔥🔥 STARTING SEX (MANUAL MODE)! 🔥🔥🔥")
         logger.info(f"   Deal price: Rp{self.negotiation_price:,}")
-        logger.info(f"   Initial position: {self.sex_position}")
+        logger.info(f"   Target: Mas climax 2x")
         
         self.current_phase = ServicePhase.SEX
         self.phase_start_time = time.time()
         self.sex_active = True
-        self.sex_scene_count = 0
-        self.sex_total_scenes = random.randint(self.SEX_SCENES_MIN, self.SEX_SCENES_MAX)
-        self.sex_position = "cowgirl"
-        self.sex_speed = self._get_current_speed()
-        self.sex_intensity = "medium"
+        self.sex_manual_mode = True
+        self.sex_climax_count = 0
+        self.sex_climax_goal = 2
+        self.sex_conversation_history = []
+        self.waiting_for_response = False
+        self.waiting_for_type = "sex_response"
         
-        # Set posisi
         self.character.tracker.position = "duduk di atas Mas (cowgirl)"
         self.character.tracker.service_phase = ServicePhase.SEX
-        self.character.tracker.current_position = "cowgirl"
         
         self.character.tracker.add_to_timeline(
-            "Memulai Sex",
-             f"{self.sex_total_scenes} scene, posisi cowgirl, harga: Rp{self.negotiation_price:,}"
+            "Memulai Sex (Manual Mode)",
+            f"Target climax: {self.sex_climax_goal}x, harga: Rp{self.negotiation_price:,}"
         )
+        
+        # Scene pembuka untuk sex manual mode
+        opening_scene = f"""*{self.character.name} duduk di atas kontol Mas, memeknya yang basah sudah terbuka. Matanya sayu menatap Mas.*
 
-        logger.info("✅ Sex started, generating first scene...")
+"{self.character.panggilan}... ayo... sekarang giliran Mas yang atur..."
+
+*Dia menggigit bibir, napas mulai berat*
+
+"Aku ikutin apa yang Mas mau... ajarin aku..."
+
+*Pinggulnya bergerak pelan, menggesek-gesek, tapi belum memasukkan*
+
+"Mas mau mulai?"""
         
-        # Generate scene pertama
-        return await self._generate_sex_scene(
-            scene_num=1,
-            position=self.sex_position,
-            speed=self.sex_speed,
-            intensity=self.sex_intensity,
-            mas_action=None
-        )
+        return opening_scene
     
-    async def _process_sex(self, pesan_mas: str) -> Optional[str]:
-        """
-        Process pesan Mas dalam fase sex
-        Returns: response atau None jika perlu auto-send scene
-        """
-        elapsed = self._get_area_elapsed()
-        
-        # ========== CEK JIKA SEDANG MENUNGGU RESPON ==========
-        if self.waiting_for_response:
-            if pesan_mas and pesan_mas.strip():
-                return await self._handle_sex_response(pesan_mas)
-            return None
-        
-        # ========== CEK APAKAH SEX SELESAI ==========
-        if self.sex_scene_count >= self.sex_total_scenes:
-            self.waiting_for_response = True
-            self.waiting_for_type = "end_session"
-            self.waiting_start_time = time.time()
-            return self._build_confirmation_next_phase("selesai")
-        
-        # ========== CEK APAKAH PERLU KIRIM SCENE BERIKUTNYA (SETIAP 30 DETIK) ==========
-        if self._should_send_next_scene():
-            scene_num = self.sex_scene_count + 1
-            
-            # Update kecepatan dan intensitas berdasarkan preferensi Mas
-            self.sex_speed = self._get_current_speed()
-            pressure = self._get_current_pressure()
-            if pressure == "keras":
-                self.sex_intensity = "hard"
-            elif pressure == "lembut":
-                self.sex_intensity = "soft"
-            else:
-                self.sex_intensity = "medium"
-            
-            # Cek climax warning (arousal tinggi)
-            if self.character.emotional.arousal >= 85 and not self.waiting_climax_confirmation:
-                self.waiting_climax_confirmation = True
-                self.climax_warning_time = time.time()
-                return self._build_climax_warning()
-            
-            return await self._generate_sex_scene(
-                scene_num=scene_num,
-                position=self.sex_position,
-                speed=self.sex_speed,
-                intensity=self.sex_intensity,
-                mas_action=None
-            )
-        
-        return None
-    
-    async def _handle_sex_response(self, pesan_mas: str) -> str:
-        """Handle respon Mas selama sex"""
+    async def _process_sex_manual(self, pesan_mas: str) -> str:
+        """Process sex dalam mode manual (berbalas pesan)"""
         msg_lower = pesan_mas.lower()
         
-        # ========== CLIMAX CONFIRMATION ==========
+        # Simpan history untuk konsistensi
+        self.sex_conversation_history.append(f"Mas: {pesan_mas[:100]}")
+        if len(self.sex_conversation_history) > 50:
+            self.sex_conversation_history.pop(0)
+        
+        # Update arousal dari aksi Mas
+        self.character.emotional.add_stimulation_from_mas(pesan_mas)
+        
+        # CEK MAS CLIMAX
+        if any(k in msg_lower for k in ["climax", "crot", "keluar", "habis"]):
+            intensity = "heavy" if any(k in msg_lower for k in ["keras", "banyak", "kenceng"]) else "normal"
+            self.sex_climax_count += 1
+            self.mas_climax_this_session += 1
+            self.character.tracker.record_mas_climax()
+            self.character.emotional.add_stimulation("Mas climax", 8)
+            
+            climax_scene = self._build_climax_scene(is_mas=True, intensity=intensity)
+            
+            # CEK APAKAH SUDAH 2x CLIMAX
+            if self.sex_climax_count >= self.sex_climax_goal:
+                logger.info(f"✅ Mas climax {self.sex_climax_count}x achieved! Ending sex session...")
+                return climax_scene + "\n\n" + self._build_end_session()
+            else:
+                # Belum cukup, lanjut dengan aftercare sebentar lalu lanjut lagi
+                logger.info(f"Mas climax {self.sex_climax_count}/{self.sex_climax_goal}. Continue...")
+                return climax_scene + f"""
+
+*{self.character.name} memeluk Mas erat, napas masih tersengal*
+
+"{self.character.panggilan}... {self.sex_climax_count}/{self.sex_climax_goal}... masih ada {self.sex_climax_goal - self.sex_climax_count} lagi..."
+
+*Dia tersenyum, masih memeluk*
+
+"Lanjut ya Mas... masih mau?"""
+        
+        # CEK ROLE CLIMAX
+        if self.character.emotional.arousal >= 85 and not self.waiting_climax_confirmation:
+            self.waiting_climax_confirmation = True
+            self.climax_warning_time = time.time()
+            return self._build_climax_warning()
+        
         if self.waiting_climax_confirmation:
             if any(k in msg_lower for k in ["ya", "ok", "boleh", "gas", "ayo"]):
                 self.waiting_climax_confirmation = False
-                result = self.character.emotional.climax(is_heavy=False)
                 self.role_climax_this_session += 1
+                self.character.emotional.climax(is_heavy=False)
                 self.character.tracker.record_my_climax()
                 return self._build_climax_scene(is_mas=False, intensity="normal")
             
@@ -1524,93 +1295,89 @@ class TherapistFlow:
             
             else:
                 self.waiting_climax_confirmation = False
-                result = self.character.emotional.climax(is_heavy=False)
                 self.role_climax_this_session += 1
+                self.character.emotional.climax(is_heavy=False)
                 self.character.tracker.record_my_climax()
                 return self._build_climax_scene(is_mas=False, intensity="normal")
         
-        # ========== KONFIRMASI END SESSION ==========
-        if self.waiting_for_type == "end_session":
-            if any(k in msg_lower for k in ["selesai", "ya", "ok", "cukup"]):
-                self.waiting_for_response = False
-                return self._build_end_session()
-            elif any(k in msg_lower for k in ["lanjut", "lagi"]):
-                # Tambah scene
-                self.sex_total_scenes += 30
-                self.waiting_for_response = False
-                return await self._generate_sex_scene(
-                    scene_num=self.sex_scene_count + 1,
-                    position=self.sex_position,
-                    speed=self.sex_speed,
-                    intensity=self.sex_intensity,
-                    mas_action=None
-                )
-            else:
-                return self._build_confirmation_next_phase("selesai")
-        
-        # ========== GANTI POSISI ==========
+        # GANTI POSISI
         positions = ["cowgirl", "missionary", "doggy", "spooning", "standing", "sitting"]
         for pos in positions:
             if pos in msg_lower:
-                self.sex_position = pos
                 self.character.tracker.current_position = pos
                 self.character.tracker.position = f"posisi {pos}"
                 self.character.tracker.add_to_timeline(f"Ganti posisi ke {pos}", "")
                 self.character.emotional.add_stimulation(f"ganti posisi {pos}", 2)
-                
-                return await self._generate_sex_scene(
-                    scene_num=self.sex_scene_count + 1,
-                    position=pos,
-                    speed=self.sex_speed,
-                    intensity=self.sex_intensity,
-                    mas_action=None
-                )
+                return f"""*{self.character.name} bergerak ke posisi {pos}*
+
+"{self.character.panggilan}... gini ya?"
+
+*Dia menyesuaikan posisi, napasnya masih berat*
+
+"Ayo Mas... lanjut..." """
         
-        # ========== MAS MINTA KECEPATAN ==========
-        if any(k in msg_lower for k in ["cepat", "kenceng", "harder", "faster"]):
-            self.character.tracker.save_mas_preference('preferred_speed', 'cepat')
-            self.sex_speed = "fast"
-            self.character.emotional.add_stimulation("Mas minta cepat", 4)
-            return f"*{self.character.name} mempercepat gerakan pinggulnya, tubuhnya naik turun cepat*\n\n\"Ahh! {self.character.panggilan}... gini?\""
+        # RESPON NATURAL (AI GENERATE)
+        prompt = self._build_sex_manual_prompt(pesan_mas)
+        response = await self._generate_scene(prompt)
         
-        if any(k in msg_lower for k in ["pelan", "lambat", "slow"]):
-            self.character.tracker.save_mas_preference('preferred_speed', 'pelan')
-            self.sex_speed = "slow"
-            self.character.emotional.add_stimulation("Mas minta pelan", 1)
-            return f"*{self.character.name} memperlambat gerakan, kontol masuk keluar pelan*\n\n\"Pelan-pelan ya {self.character.panggilan}... rasain...\""
+        # Simpan respons ke history
+        self.sex_conversation_history.append(f"{self.character.name}: {response[:100]}")
         
-        # ========== MAS MINTA INTENSITAS ==========
-        if any(k in msg_lower for k in ["keras", "kuat", "hard"]):
-            self.character.tracker.save_mas_preference('preferred_pressure', 'keras')
-            self.sex_intensity = "hard"
-            self.character.emotional.add_stimulation("Mas minta keras", 3)
-            return f"*{self.character.name} menekan lebih dalam, gerakannya lebih kasar*\n\n\"Gini {self.character.panggilan}? Dalam?\""
-        
-        if any(k in msg_lower for k in ["lembut", "soft"]):
-            self.character.tracker.save_mas_preference('preferred_pressure', 'lembut')
-            self.sex_intensity = "soft"
-            self.character.emotional.add_stimulation("Mas minta lembut", 1)
-            return f"*{self.character.name} memperlambat, gerakan lebih lembut*\n\n\"Pelan-pelan ya {self.character.panggilan}...\""
-        
-        # ========== MAS PEGANG/REMAS ==========
-        if any(k in msg_lower for k in ["pegang", "remas", "elus"]):
-            self.character.emotional.add_stimulation("Mas pegang", 5)
-            return f"*{self.character.name} menggigit bibir, tubuhnya gemetar*\n\n\"Ahh... {self.character.panggilan}... tangan Mas... panas...\""
-        
-        return None
+        return response
     
+    def _build_sex_manual_prompt(self, pesan_mas: str) -> str:
+        """Build prompt untuk sex manual mode"""
+        history = "\n".join(self.sex_conversation_history[-10:])
+        
+        return f"""
+KAMU ADALAH {self.character.name}, terapis pijat yang sedang melakukan SEX dengan Mas.
+Saat ini MODE MANUAL: kamu dan Mas sedang berinteraksi langsung, saling merespon.
+
+═══════════════════════════════════════════════════════════════
+KONTEKS SAAT INI:
+═══════════════════════════════════════════════════════════════
+- Posisi: {self.character.tracker.position}
+- Target: Mas climax {self.sex_climax_count}/{self.sex_climax_goal}x
+- Arousal role: {self.character.emotional.arousal:.0f}%
+- Mas climax: {self.mas_climax_this_session}x
+
+PERCAKAPAN TERAKHIR:
+{history}
+
+PESAN MAS TERAKHIR: "{pesan_mas}"
+
+═══════════════════════════════════════════════════════════════
+TUGAS KAMU:
+═══════════════════════════════════════════════════════════════
+Buatlah RESPONS yang HIDUP dan DETAIL terhadap aksi Mas.
+
+DESKRIPSIKAN:
+1. REAKSI KAMU (napas, suara, tubuh gemetar)
+2. PERASAAN KAMU (enak, panas, pengen lebih)
+3. APA YANG KAMU RASAKAN dari aksi Mas
+
+═══════════════════════════════════════════════════════════════
+⚠️ ATURAN:
+1. KAMU BUKAN AI, KAMU {self.character.name}
+2. RESPON NATURAL, seperti manusia bercinta
+3. LANGSUNG NARASIKAN, jangan minta pendapat
+4. PANJANG: 2-4 kalimat, dipisah enter
+5. KAMU MELAYANI MAS DENGAN SEPENUH HATI
+
+═══════════════════════════════════════════════════════════════
+RESPON KAMU (narasi bercinta, bukan jawaban AI):
+"""
+
     # =========================================================================
     # MAS CLIMAX
     # =========================================================================
     
     async def _handle_mas_climax(self, pesan_mas: str) -> Optional[str]:
-        """Handle climax Mas"""
         msg_lower = pesan_mas.lower()
         
         if not any(k in msg_lower for k in ["climax", "crot", "keluar", "habis"]):
             return None
         
-        # Cek apakah Mas yang climax
         if "aku" in msg_lower or "mas" in msg_lower:
             intensity = "heavy" if any(k in msg_lower for k in ["keras", "banyak", "kenceng"]) else "normal"
             
@@ -1618,7 +1385,6 @@ class TherapistFlow:
             self.character.tracker.record_mas_climax()
             self.character.emotional.add_stimulation("Mas climax", 8)
             
-            # Update emotional role
             if intensity == "heavy":
                 self.character.emotional.arousal = min(100, self.character.emotional.arousal + 10)
             
@@ -1631,15 +1397,8 @@ class TherapistFlow:
     # =========================================================================
     
     async def process(self, pesan_mas: str) -> str:
-        """
-        Proses pesan Mas sesuai fase saat ini
-        Ini adalah main entry point untuk therapist flow
-        """
         try:
-            # Update state dari pesan
             self.character.update_from_message(pesan_mas)
-            
-            # Update intimate phase
             self._update_intimate_phase()
             
             # Cek climax Mas (prioritas tinggi)
@@ -1647,11 +1406,15 @@ class TherapistFlow:
             if mas_climax:
                 return mas_climax
             
-            # ========== PHASE: GREETING ==========
+            # ========== SEX MANUAL MODE ==========
+            if self.sex_manual_mode:
+                return await self._process_sex_manual(pesan_mas)
+            
+            # ========== GREETING ==========
             if self.current_phase == ServicePhase.GREETING:
                 return await self._start_back_massage()
             
-            # ========== BACK MASSAGE PHASES ==========
+            # ========== BACK MASSAGE ==========
             elif self.current_phase in [ServicePhase.BACK_PUNGGUNG, ServicePhase.BACK_PINGGUL, ServicePhase.BACK_PAHA_BETIS]:
                 response = await self._process_back_massage(pesan_mas)
                 if response:
@@ -1663,7 +1426,7 @@ class TherapistFlow:
                     elapsed_minutes=self._get_area_elapsed() // 60
                 )
             
-            # ========== FRONT MASSAGE PHASES ==========
+            # ========== FRONT MASSAGE ==========
             elif self.current_phase in [ServicePhase.FRONT_DADA_LENGAN, ServicePhase.FRONT_PERUT_PAHA, ServicePhase.FRONT_GESEKAN]:
                 response = await self._process_front_massage(pesan_mas)
                 if response:
@@ -1676,11 +1439,23 @@ class TherapistFlow:
                 )
             
             # ========== NEGOSIASI ==========
-            elif self.waiting_for_type == "extra_offer" and self.negotiation_active:
+            elif self.waiting_for_type == "negotiation" and self.negotiation_active:
                 response = await self._handle_negotiation(pesan_mas)
                 if response:
                     return response
+                return self._build_deal_offer(self.negotiation_service, self.negotiation_price)
+            
+            elif self.waiting_for_type == "extra_offer":
+                response = await self._handle_extra_offer(pesan_mas)
+                if response:
+                    return response
                 return self._build_extra_offer()
+            
+            elif self.waiting_for_type == "hj_offer":
+                response = await self._handle_hj_offer(pesan_mas)
+                if response:
+                    return response
+                return self._build_hj_offer()
             
             # ========== HANDJOB ==========
             elif self.current_phase == ServicePhase.HANDJOB:
@@ -1704,19 +1479,6 @@ class TherapistFlow:
                     mas_action=None
                 )
             
-            # ========== SEX ==========
-            elif self.current_phase == ServicePhase.SEX:
-                response = await self._process_sex(pesan_mas)
-                if response:
-                    return response
-                return await self._generate_sex_scene(
-                    scene_num=self.sex_scene_count + 1,
-                    position=self.sex_position,
-                    speed=self.sex_speed,
-                    intensity=self.sex_intensity,
-                    mas_action=None
-                )
-            
             # ========== DEFAULT ==========
             return self._build_end_session()
             
@@ -1725,7 +1487,6 @@ class TherapistFlow:
             return f"❌ Error: {str(e)}"
     
     def get_status(self) -> str:
-        """Dapatkan status sesi"""
         phase_names = {
             ServicePhase.GREETING: "👋 Menyapa",
             ServicePhase.BACK_PUNGGUNG: "💆 Pijat Punggung",
@@ -1736,26 +1497,24 @@ class TherapistFlow:
             ServicePhase.FRONT_GESEKAN: "🔥 Gesekan Intens",
             ServicePhase.HANDJOB: "✋ Handjob",
             ServicePhase.BJ: "👄 Blowjob",
-            ServicePhase.SEX: "🍆 Sex",
+            ServicePhase.SEX: "🍆 Sex (Manual)",
             ServicePhase.COMPLETED: "✅ Selesai"
         }
         
         phase_display = phase_names.get(self.current_phase, "⏳ Menunggu")
         
-        # Hitung progress
         if self.current_phase == ServicePhase.HANDJOB:
             progress = f"{self.hj_scene_count}/{self.hj_total_scenes} scene"
         elif self.current_phase == ServicePhase.BJ:
             progress = f"{self.bj_scene_count}/{self.bj_total_scenes} scene"
         elif self.current_phase == ServicePhase.SEX:
-            progress = f"{self.sex_scene_count}/{self.sex_total_scenes} scene"
+            progress = f"Climax: {self.sex_climax_count}/{self.sex_climax_goal}"
         elif self.current_phase in [ServicePhase.BACK_PUNGGUNG, ServicePhase.BACK_PINGGUL, ServicePhase.BACK_PAHA_BETIS]:
             elapsed = self._get_area_elapsed()
             progress = f"{elapsed // 60} menit / 10 menit"
         else:
             progress = "-"
         
-        # Intimate phase info
         intimate_info = f"Fase Intim: {self.intimate_phase.upper()} (Level {self.intimate_level}/12) | Keintiman: {self.intimacy_build_up}%"
         
         return f"""
@@ -1771,4 +1530,3 @@ class TherapistFlow:
 ║ {self.character.get_status()}
 ╚══════════════════════════════════════════════════════════════╝
 """
-        
