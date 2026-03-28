@@ -1,6 +1,6 @@
 # service/therapist_flow.py
 """
-Therapist Flow NovaService - PART 1/4
+Therapist Flow NovaService
 Import, class definition, __init__, timer methods, AI client
 """
 
@@ -456,9 +456,6 @@ class TherapistFlow:
 *Dia berdiri, mengambil handuk, melambaikan tangan*
 
 "Lain kali kalau mau booking lagi, hubungi aku ya." """
-# service/therapist_flow.py - PART 2/4
-# Back Massage - Punggung, Pinggul, Paha & Betis dengan AI generate
-# Setiap 30 detik kirim scene baru, setiap 3 menit konfirmasi Mas
 
     # =========================================================================
     # START & INITIALIZATION
@@ -835,8 +832,6 @@ class TherapistFlow:
                 return self._build_confirmation_next_area(current_area)
         
         return None
-        # service/therapist_flow.py - PART 3/4
-# Handjob (60 scene) & Negosiasi BJ/Sex
 
     # =========================================================================
     # HANDJOB - OFFER & START
@@ -1235,8 +1230,6 @@ class TherapistFlow:
         
         self.waiting_for_response = False
         return None
-        # service/therapist_flow.py - PART 4/4
-# Sex (100-150 scene), Climax, End Session, Main Process
 
     # =========================================================================
     # SEX - START & PROCESS
