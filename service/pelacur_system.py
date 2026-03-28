@@ -46,6 +46,13 @@ class PelacurSystem(PelacurAuto, PelacurManual):
         
         # ========== WARNING TRACKING (SUDAH ADA DI CORE) ==========
         # self._sent_warnings
+
+        # ========== CLOTHING STATE ==========
+        self.mas_clothing = {
+            'celana': 'sudah dibuka',      # 'masih pakai', 'sudah dibuka'
+            'cd': 'sudah dibuka',           # 'masih pakai', 'sudah dibuka'
+            'baju': 'sudah dibuka',          # 'masih pakai', 'sudah dibuka'
+        }
         
         logger.info(f"🔥 PelacurSystem initialized for {character.name}")
         logger.info(f"   Inherited from: PelacurAuto, PelacurManual")
@@ -228,7 +235,97 @@ class PelacurSystem(PelacurAuto, PelacurManual):
                     return f"*{self.character.name} mendekat, memeluk Mas erat*\n\n\"{self.character.panggilan}... tinggal {minutes_left} menit lagi... aku bakal kangen...\""
         
         return None
+    # service/pelacur_memory.py
+# Tambahkan method ini di dalam class PelacurMemory (setelah method get_climax_context)
+
+    def get_full_context(self) -> str:
+        """Dapatkan semua konteks memory untuk prompt AI (gabungan semua)"""
     
+        # Status napas
+        napas_desc = {
+            'stabil': "napas masih stabil, belum terpengaruh",
+            'berat': "napas sudah mulai berat, dada naik turun",
+            'tersengal': "napas tersengal-sengal, mulai tidak terkontrol",
+            'putus-putus': "napas putus-putus, nyaris kehabisan napas"
+        }
+    
+        # Status suhu
+        suhu_desc = {
+            'normal': "suhu tubuh normal",
+            'hangat': "tubuh mulai hangat",
+            'panas': "tubuh terasa panas, menggairahkan"
+        }
+    
+        # Status pakaian Mas
+        clothing_status = getattr(self, 'mas_clothing', {
+            'celana': 'sudah dibuka',
+            'cd': 'sudah dibuka',
+            'baju': 'sudah dibuka'
+        })
+    
+        return f"""
+╔═══════════════════════════════════════════════════════════════════════════════╗
+║                         📝 MEMORY ROLE (JANGAN LUPA!)                         ║
+╚═══════════════════════════════════════════════════════════════════════════════╝
+
+┌───────────────────────────────────────────────────────────────────────────────┐
+│ 📍 POSISI & GERAKAN:                                                          │
+├───────────────────────────────────────────────────────────────────────────────┤
+│ • Posisi terakhir: {self.last_position or 'belum ditentukan'}                          │
+│ • Gerakan terakhir: {self.last_movement or 'belum ada'}                                 │
+│ • Kecepatan: {self.last_speed}                                                          │
+└───────────────────────────────────────────────────────────────────────────────┘
+
+┌───────────────────────────────────────────────────────────────────────────────┐
+│ 🫀 KONDISI TUBUH:                                                             │
+├───────────────────────────────────────────────────────────────────────────────┤
+│ • Napas: {napas_desc.get(self.body_state['napas'], self.body_state['napas'])}                 │
+│ • Suhu tubuh: {suhu_desc.get(self.body_state['suhu'], self.body_state['suhu'])}               │
+│ • Gemetar: {'Ya, tubuh mulai gemetar' if self.body_state.get('gemetar', False) else 'Tidak, masih stabil'} │
+│ • Keringat: {self.body_state.get('keringat', 'sedikit')}                                       │
+└───────────────────────────────────────────────────────────────────────────────┘
+
+┌───────────────────────────────────────────────────────────────────────────────┐
+│ 💖 PERASAAN & EKSPRESI:                                                       │
+├───────────────────────────────────────────────────────────────────────────────┤
+│ • Perasaan: {self.current_feeling or 'normal, menikmati'}                               │
+│ • Ekspresi: {self.last_expression or 'normal, menatap Mas'}                            │
+│ • Kata terakhir: "{self.last_words or 'belum bicara'}"                                    │
+└───────────────────────────────────────────────────────────────────────────────┘
+
+┌───────────────────────────────────────────────────────────────────────────────┐
+│ 👕 STATUS PAKAIAN MAS:                                                        │
+├───────────────────────────────────────────────────────────────────────────────┤
+│ • Celana: {clothing_status.get('celana', 'sudah dibuka')}                               │
+│ • CD: {clothing_status.get('cd', 'sudah dibuka')}                                       │
+│ • Baju: {clothing_status.get('baju', 'sudah dibuka')}                                    │
+│ ⚠️ JANGAN minta Mas buka celana lagi! SUDAH TELANJANG dari awal!                          │
+│ ⚠️ JANGAN mundur kefase sebelumnya!                                                      │
+│ ⚠️ FOKUS pada aktifitas yang berlangsung dan kontinue (BJ, Kissing, Petting, dll!              │
+└───────────────────────────────────────────────────────────────────────────────┘
+
+┌───────────────────────────────────────────────────────────────────────────────┐
+│ 📝 PERCAKAPAN TERAKHIR:                                                       │
+├───────────────────────────────────────────────────────────────────────────────┤
+│ {self.get_recent_context(5)}                                                  │
+└───────────────────────────────────────────────────────────────────────────────┘
+
+┌───────────────────────────────────────────────────────────────────────────────┐
+│ 💦 CLIMAX:                                                                    │
+├───────────────────────────────────────────────────────────────────────────────┤
+│ • Total climax Mas: {self.cum_count if hasattr(self, 'cum_count') else 0}x              │
+│ • Total climax Role: {self.role_climax_count if hasattr(self, 'role_climax_count') else 0}x │
+└───────────────────────────────────────────────────────────────────────────────┘
+
+⚠️ ATURAN KONSISTENSI WAJIB:
+1. LANJUTKAN dari posisi terakhir: {self.last_position or 'belum ada'}
+2. LANJUTKAN gerakan: {self.last_movement or 'belum ada'} dengan kecepatan {self.last_speed}
+3. JANGAN LUPA kondisi tubuhmu: napas {self.body_state.get('napas', 'stabil')}
+4. JANGAN MUNDUR! Mas SUDAH TELANJANG dari awal sesi (celana dan CD sudah dibuka)
+5. JANGAN minta Mas buka celana lagi!
+6. LANJUTKAN dari percakapan terakhir, jangan ulang dari awal!
+"""
+
     # =========================================================================
     # CYCLE LOOP SYSTEM
     # =========================================================================
@@ -749,7 +846,13 @@ class PelacurSystem(PelacurAuto, PelacurManual):
         self.booking_end_time = self.booking_start_time + self.TOTAL_BOOKING_SECONDS
         self.cycle_start_time = self.booking_start_time
         self.current_cycle = 1
-    
+
+        # Set status pakaian Mas di awal
+        self.memory.mas_clothing = {
+            'celana': 'sudah dibuka',
+            'cd': 'sudah dibuka',
+            'baju': 'sudah dibuka',
+        }
         # Reset semua state
         self.current_phase_name = "confirmation"
         self.auto_send_active = False
