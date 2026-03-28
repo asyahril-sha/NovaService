@@ -119,8 +119,13 @@ class TherapistFlow:
         # ========== AUTO SEND QUEUE ==========
         self.auto_send_task = None
         self.last_scene_sent_time = 0
+
+        # ========== PAUSE & RESUME ==========
+        self.is_paused = False
+        self.pause_start_time = 0
         
         logger.info(f"💆 TherapistFlow initialized for {character.name}")
+        
     
     # =========================================================================
     # AI CLIENT
