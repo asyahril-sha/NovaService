@@ -233,7 +233,7 @@ DESIRE: {self.character.emotional.desire:.0f}% (pengen bikin Mas climax)
 └───────────────────────────────────────────────────────────────────────────────┘
 """
 
-    clothing_warning = """
+        clothing_warning = """
 ⚠️⚠️⚠️ PERINGATAN WAJIB ⚠️⚠️⚠️
 Mas SUDAH TELANJANG! Celana sudah dibuka dari awal sesi.
 JANGAN PERNAH minta Mas buka celana! LANJUTKAN aktivitas yang sedang berlangsung!
