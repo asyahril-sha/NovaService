@@ -1,13 +1,18 @@
 # service/pelacur_system.py
 """
 Pelacur System - Main Process, Start, Loop, Climax, Warning
-FIXED: Multiple inheritance dari PelacurAuto dan PelacurManual
+FULL VERSION dengan semua perbaikan:
+- Multiple inheritance dari PelacurAuto dan PelacurManual
+- Conversation history untuk tracking percakapan
+- Memory penuh dengan status pakaian Mas
+- Climax tracking lengkap
 """
 
 import asyncio
 import time
 import logging
-from typing import Optional
+from typing import Optional, List
+from collections import deque
 
 from core import ServicePhase
 from service.pelacur_core import PelacurCore
@@ -26,52 +31,54 @@ class PelacurSystem(PelacurAuto, PelacurManual):
     - PelacurManual: manual phase (7 fase)
     - PelacurCore: base class (via inheritance chain)
     
-    Berisi: Main process, start session, loop system, climax detection, warning system
+    FITUR:
+    - Booking 6 jam FULL BOOKING
+    - Auto BJ (30 menit) dan Kissing (30 menit)
+    - Manual mode dengan AI untuk 7 fase
+    - Climax natural (tanpa minta izin)
+    - Warning booking setiap 1 jam
+    - Loop cycle dengan konfirmasi
+    - Memory penuh (tidak ngelantur)
     """
     
     def __init__(self, character):
         """Inisialisasi PelacurSystem dengan multiple inheritance"""
         # Panggil init dari parent classes
-        # Python MRO akan menangani urutan dengan benar
         super().__init__(character)
         
-        # ========== BOOKING STATE (SUDAH ADA DI CORE) ==========
-        # self.is_active, self.booking_start_time, dll sudah di-set di PelacurCore.__init__
+        # ========== CONVERSATION HISTORY ==========
+        self.conversation_history: List[str] = []           # History percakapan (50 max)
+        self.conversation_context: deque = deque(maxlen=50)  # 50 percakapan terakhir untuk prompt
+        self.scene_context: deque = deque(maxlen=30)         # 30 scene terakhir
         
-        # ========== PHASE STATE (SUDAH ADA DI CORE) ==========
+        # ========== MEMORY SYSTEM (sudah ada di core) ==========
+        # self.memory sudah diinisialisasi di PelacurCore
+        
+        # ========== BOOKING STATE (sudah ada di core) ==========
+        # self.is_active, self.booking_start_time, dll
+        
+        # ========== PHASE STATE (sudah ada di core) ==========
         # self.current_phase_name, self.auto_send_active, dll
         
-        # ========== WAITING FOR RESPONSE (SUDAH ADA DI CORE) ==========
+        # ========== WAITING FOR RESPONSE (sudah ada di core) ==========
         # self.waiting_for_response, self.waiting_for_type, dll
         
-        # ========== WARNING TRACKING (SUDAH ADA DI CORE) ==========
+        # ========== WARNING TRACKING (sudah ada di core) ==========
         # self._sent_warnings
-
-        # ========== CLOTHING STATE ==========
-        self.mas_clothing = {
-            'celana': 'sudah dibuka',      # 'masih pakai', 'sudah dibuka'
-            'cd': 'sudah dibuka',           # 'masih pakai', 'sudah dibuka'
-            'baju': 'sudah dibuka',          # 'masih pakai', 'sudah dibuka'
-        }
         
         logger.info(f"🔥 PelacurSystem initialized for {character.name}")
         logger.info(f"   Inherited from: PelacurAuto, PelacurManual")
-
-    def update_mas_clothing(self, item: str, status: str):
-        """Update status pakaian Mas"""
-        if item in self.mas_clothing:
-            self.mas_clothing[item] = status
-            logger.info(f"👕 Mas clothing updated: {item} = {status}")
-
+        logger.info(f"   Conversation history: 50 max | Scene context: 30 max")
     
     # =========================================================================
-    # CLIMAX DETECTION (NATURAL - OVERRIDE UNTUK KONSISTENSI)
+    # CLIMAX DETECTION (NATURAL - TANPA MINTA IZIN)
     # =========================================================================
     
     async def _check_role_natural_climax(self) -> Optional[str]:
         """
         Cek apakah role natural climax
-        Override dari PelacurManual untuk konsistensi dengan system
+        Role bisa climax kapan saja jika arousal > 85
+        TANPA minta izin, langsung climax dengan narasi
         """
         arousal = self.character.emotional.arousal
         
@@ -107,6 +114,9 @@ class PelacurSystem(PelacurAuto, PelacurManual):
             intensity = "heavy" if arousal >= 90 else "normal"
             climax_scene = self._build_climax_scene(is_mas=False, intensity=intensity)
             
+            # Simpan ke scene context
+            self.scene_context.append(f"ROLE CLIMAX #{self.role_climax_count}")
+            
             logger.info(f"💦 ROLE NATURAL CLIMAX #{self.role_climax_count} (arousal: {arousal:.0f}%)")
             
             return climax_scene
@@ -116,7 +126,7 @@ class PelacurSystem(PelacurAuto, PelacurManual):
     async def _check_mas_climax(self, pesan_mas: str) -> Optional[str]:
         """
         Deteksi climax Mas dari pesan
-        Override dari PelacurManual untuk konsistensi dengan system
+        Mas bisa climax kapan saja, langsung terdeteksi
         """
         msg_lower = pesan_mas.lower()
         
@@ -143,6 +153,9 @@ class PelacurSystem(PelacurAuto, PelacurManual):
             
             # Build climax scene
             climax_scene = self._build_climax_scene(is_mas=True, intensity=intensity, location=location)
+            
+            # Simpan ke scene context
+            self.scene_context.append(f"MAS CLIMAX #{self.mas_climax_count} at {location}")
             
             logger.info(f"💦 MAS CLIMAX #{self.mas_climax_count} - location: {location}")
             
@@ -242,97 +255,7 @@ class PelacurSystem(PelacurAuto, PelacurManual):
                     return f"*{self.character.name} mendekat, memeluk Mas erat*\n\n\"{self.character.panggilan}... tinggal {minutes_left} menit lagi... aku bakal kangen...\""
         
         return None
-    # service/pelacur_memory.py
-# Tambahkan method ini di dalam class PelacurMemory (setelah method get_climax_context)
-
-    def get_full_context(self) -> str:
-        """Dapatkan semua konteks memory untuk prompt AI (gabungan semua)"""
     
-        # Status napas
-        napas_desc = {
-            'stabil': "napas masih stabil, belum terpengaruh",
-            'berat': "napas sudah mulai berat, dada naik turun",
-            'tersengal': "napas tersengal-sengal, mulai tidak terkontrol",
-            'putus-putus': "napas putus-putus, nyaris kehabisan napas"
-        }
-    
-        # Status suhu
-        suhu_desc = {
-            'normal': "suhu tubuh normal",
-            'hangat': "tubuh mulai hangat",
-            'panas': "tubuh terasa panas, menggairahkan"
-        }
-    
-        # Status pakaian Mas
-        clothing_status = getattr(self, 'mas_clothing', {
-            'celana': 'sudah dibuka',
-            'cd': 'sudah dibuka',
-            'baju': 'sudah dibuka'
-        })
-    
-        return f"""
-╔═══════════════════════════════════════════════════════════════════════════════╗
-║                         📝 MEMORY ROLE (JANGAN LUPA!)                         ║
-╚═══════════════════════════════════════════════════════════════════════════════╝
-
-┌───────────────────────────────────────────────────────────────────────────────┐
-│ 📍 POSISI & GERAKAN:                                                          │
-├───────────────────────────────────────────────────────────────────────────────┤
-│ • Posisi terakhir: {self.last_position or 'belum ditentukan'}                          │
-│ • Gerakan terakhir: {self.last_movement or 'belum ada'}                                 │
-│ • Kecepatan: {self.last_speed}                                                          │
-└───────────────────────────────────────────────────────────────────────────────┘
-
-┌───────────────────────────────────────────────────────────────────────────────┐
-│ 🫀 KONDISI TUBUH:                                                             │
-├───────────────────────────────────────────────────────────────────────────────┤
-│ • Napas: {napas_desc.get(self.body_state['napas'], self.body_state['napas'])}                 │
-│ • Suhu tubuh: {suhu_desc.get(self.body_state['suhu'], self.body_state['suhu'])}               │
-│ • Gemetar: {'Ya, tubuh mulai gemetar' if self.body_state.get('gemetar', False) else 'Tidak, masih stabil'} │
-│ • Keringat: {self.body_state.get('keringat', 'sedikit')}                                       │
-└───────────────────────────────────────────────────────────────────────────────┘
-
-┌───────────────────────────────────────────────────────────────────────────────┐
-│ 💖 PERASAAN & EKSPRESI:                                                       │
-├───────────────────────────────────────────────────────────────────────────────┤
-│ • Perasaan: {self.current_feeling or 'normal, menikmati'}                               │
-│ • Ekspresi: {self.last_expression or 'normal, menatap Mas'}                            │
-│ • Kata terakhir: "{self.last_words or 'belum bicara'}"                                    │
-└───────────────────────────────────────────────────────────────────────────────┘
-
-┌───────────────────────────────────────────────────────────────────────────────┐
-│ 👕 STATUS PAKAIAN MAS:                                                        │
-├───────────────────────────────────────────────────────────────────────────────┤
-│ • Celana: {clothing_status.get('celana', 'sudah dibuka')}                               │
-│ • CD: {clothing_status.get('cd', 'sudah dibuka')}                                       │
-│ • Baju: {clothing_status.get('baju', 'sudah dibuka')}                                    │
-│ ⚠️ JANGAN minta Mas buka celana lagi! SUDAH TELANJANG dari awal!                          │
-│ ⚠️ JANGAN mundur kefase sebelumnya!                                                      │
-│ ⚠️ FOKUS pada aktifitas yang berlangsung dan kontinue (BJ, Kissing, Petting, dll!              │
-└───────────────────────────────────────────────────────────────────────────────┘
-
-┌───────────────────────────────────────────────────────────────────────────────┐
-│ 📝 PERCAKAPAN TERAKHIR:                                                       │
-├───────────────────────────────────────────────────────────────────────────────┤
-│ {self.get_recent_context(5)}                                                  │
-└───────────────────────────────────────────────────────────────────────────────┘
-
-┌───────────────────────────────────────────────────────────────────────────────┐
-│ 💦 CLIMAX:                                                                    │
-├───────────────────────────────────────────────────────────────────────────────┤
-│ • Total climax Mas: {self.cum_count if hasattr(self, 'cum_count') else 0}x              │
-│ • Total climax Role: {self.role_climax_count if hasattr(self, 'role_climax_count') else 0}x │
-└───────────────────────────────────────────────────────────────────────────────┘
-
-⚠️ ATURAN KONSISTENSI WAJIB:
-1. LANJUTKAN dari posisi terakhir: {self.last_position or 'belum ada'}
-2. LANJUTKAN gerakan: {self.last_movement or 'belum ada'} dengan kecepatan {self.last_speed}
-3. JANGAN LUPA kondisi tubuhmu: napas {self.body_state.get('napas', 'stabil')}
-4. JANGAN MUNDUR! Mas SUDAH TELANJANG dari awal sesi (celana dan CD sudah dibuka)
-5. JANGAN minta Mas buka celana lagi!
-6. LANJUTKAN dari percakapan terakhir, jangan ulang dari awal!
-"""
-
     # =========================================================================
     # CYCLE LOOP SYSTEM
     # =========================================================================
@@ -372,6 +295,9 @@ class PelacurSystem(PelacurAuto, PelacurManual):
         # Reset timer tracking
         self.scene_count = 0
         self.phase_start_time = time.time()
+        
+        # Reset conversation context (tapi tetap simpan history)
+        # self.conversation_context.clear()  # optional
         
         # Mulai dari BJ auto
         self.current_phase_name = "bj"
@@ -615,33 +541,42 @@ class PelacurSystem(PelacurAuto, PelacurManual):
             # Update memory dari pesan Mas
             self.memory.update_from_mas(pesan_mas)
             
-            # Simpan ke conversation history
+            # ========== SIMPAN KE CONVERSATION HISTORY ==========
             self.conversation_history.append(f"Mas: {pesan_mas[:100]}")
             if len(self.conversation_history) > 50:
                 self.conversation_history.pop(0)
+            
+            # Simpan ke conversation context untuk prompt
+            self.conversation_context.append(f"Mas: {pesan_mas[:100]}")
+            # ====================================================
             
             # ========== CEK CLIMAX MAS ==========
             mas_climax = await self._check_mas_climax(pesan_mas)
             if mas_climax:
                 self.memory.record_action(pesan_mas, mas_climax)
+                self.scene_context.append(f"Response: {mas_climax[:50]}...")
                 return mas_climax
             
             # ========== CEK ROLE NATURAL CLIMAX ==========
             role_climax = await self._check_role_natural_climax()
             if role_climax:
                 self.memory.record_action(pesan_mas, role_climax)
+                self.scene_context.append(f"Response: {role_climax[:50]}...")
                 return role_climax
             
             # ========== CEK WARNING BOOKING ==========
             warning = await self._check_and_send_warning()
             if warning:
                 self.memory.record_action(pesan_mas, warning)
+                self.scene_context.append(f"Warning: {warning[:50]}...")
                 return warning
             
             # ========== HANDLE WAITING FOR RESPONSE ==========
             if self.waiting_for_response:
                 if pesan_mas and pesan_mas.strip():
-                    return await self._handle_waiting_response(pesan_mas)
+                    response = await self._handle_waiting_response(pesan_mas)
+                    self.scene_context.append(f"Response: {response[:50]}...")
+                    return response
                 return None
             
             # ========== MANUAL MODE AKTIF ==========
@@ -649,15 +584,21 @@ class PelacurSystem(PelacurAuto, PelacurManual):
                 response = await self._handle_manual_by_type(pesan_mas)
                 self.memory.record_action(pesan_mas, response)
                 self.memory.update_from_response(response, self.manual_mode_type)
+                self.scene_context.append(f"Response: {response[:50]}...")
                 return response
             
             # ========== AUTO SEND ACTIVE ==========
             if self.auto_send_active:
-                return await self._process_auto_phase()
+                response = await self._process_auto_phase()
+                if response:
+                    self.scene_context.append(f"Auto scene: {response[:50]}...")
+                return response
             
             # ========== AFTERCARE ACTIVE ==========
             if self.aftercare_active:
-                return await self._handle_aftercare(pesan_mas)
+                response = await self._handle_aftercare(pesan_mas)
+                self.scene_context.append(f"Aftercare: {response[:50]}...")
+                return response
             
             # ========== DEFAULT ==========
             return self._build_end_session()
@@ -762,21 +703,31 @@ class PelacurSystem(PelacurAuto, PelacurManual):
     async def _handle_manual_by_type(self, pesan_mas: str) -> str:
         """Handle manual mode berdasarkan tipe (method dari PelacurManual)"""
         if self.manual_mode_type == "foreplay_mas":
-            return await self.handle_foreplay(pesan_mas)
+            response = await self.handle_foreplay(pesan_mas)
         elif self.manual_mode_type == "cowgirl":
-            return await self.handle_cowgirl(pesan_mas)
+            response = await self.handle_cowgirl(pesan_mas)
         elif self.manual_mode_type == "cunnilingus":
-            return await self.handle_cunnilingus(pesan_mas)
+            response = await self.handle_cunnilingus(pesan_mas)
         elif self.manual_mode_type == "missionary":
-            return await self.handle_missionary(pesan_mas)
+            response = await self.handle_missionary(pesan_mas)
         elif self.manual_mode_type == "doggy":
-            return await self.handle_doggy(pesan_mas)
+            response = await self.handle_doggy(pesan_mas)
         elif self.manual_mode_type == "position_change":
-            return await self.handle_position_change(pesan_mas)
+            response = await self.handle_position_change(pesan_mas)
         elif self.manual_mode_type == "aftercare":
-            return await self.handle_aftercare(pesan_mas)
+            response = await self.handle_aftercare(pesan_mas)
+        else:
+            response = f"*{self.character.name} tersenyum, menunggu Mas*"
         
-        return f"*{self.character.name} tersenyum, menunggu Mas*"
+        # Simpan response ke conversation history
+        self.conversation_history.append(f"{self.character.name}: {response[:100]}")
+        if len(self.conversation_history) > 50:
+            self.conversation_history.pop(0)
+        
+        # Simpan ke conversation context
+        self.conversation_context.append(f"{self.character.name}: {response[:100]}")
+        
+        return response
     
     async def _process_auto_phase(self) -> Optional[str]:
         """Process auto phase (method dari PelacurAuto)"""
@@ -826,7 +777,14 @@ class PelacurSystem(PelacurAuto, PelacurManual):
             return await self._start_next_cycle()
         
         # Gunakan method aftercare dari PelacurManual
-        return await self.handle_aftercare(pesan_mas)
+        response = await self.handle_aftercare(pesan_mas)
+        
+        # Simpan ke conversation history
+        self.conversation_history.append(f"{self.character.name}: {response[:100]}")
+        if len(self.conversation_history) > 50:
+            self.conversation_history.pop(0)
+        
+        return response
     
     # =========================================================================
     # START SESSION
@@ -835,31 +793,25 @@ class PelacurSystem(PelacurAuto, PelacurManual):
     async def start(self, location: str = "ruang tamu", price: int = 10000000, duration_hours: int = None) -> str:
         """
         Mulai sesi pelacur
-    
+        
         Args:
             location: Lokasi booking (ruang tamu, hotel, dll)
-            price: Harga booking
+            price: Harga booking (default 10jt)
             duration_hours: Durasi booking dalam jam (opsional, default 6 jam)
         """
         self.is_active = True
         self.current_phase = ServicePhase.GREETING
         self.booking_start_time = time.time()
-    
-        # Gunakan duration_hours jika diberikan,否则 pakai default 6 jam
+        
+        # Gunakan duration_hours jika diberikan
         if duration_hours is not None:
             self.TOTAL_BOOKING_HOURS = duration_hours
             self.TOTAL_BOOKING_SECONDS = duration_hours * 3600
-    
+        
         self.booking_end_time = self.booking_start_time + self.TOTAL_BOOKING_SECONDS
         self.cycle_start_time = self.booking_start_time
         self.current_cycle = 1
-
-        # Set status pakaian Mas di awal
-        self.memory.mas_clothing = {
-            'celana': 'sudah dibuka',
-            'cd': 'sudah dibuka',
-            'baju': 'sudah dibuka',
-        }
+        
         # Reset semua state
         self.current_phase_name = "confirmation"
         self.auto_send_active = False
@@ -870,21 +822,35 @@ class PelacurSystem(PelacurAuto, PelacurManual):
         self.mas_climax_count = 0
         self.role_climax_count = 0
         self._sent_warnings = []
-    
+        
+        # Reset conversation history
+        self.conversation_history = []
+        self.conversation_context.clear()
+        self.scene_context.clear()
+        
         # Set booking info ke character
         self.character.booking_location = location
         self.character.booking_price = price
         self.character.booking_duration = self.TOTAL_BOOKING_HOURS
-    
-        # Reset memory
+        
+        # Reset memory dengan status pakaian Mas
         self.memory = PelacurMemory(self.character.name)
-    
+        self.memory.mas_clothing = {
+            'celana': 'sudah dibuka',
+            'cd': 'sudah dibuka',
+            'baju': 'masih pakai',
+        }
+        self.memory.cum_count = 0
+        self.memory.role_climax_count = 0
+        self.memory.cum_locations = []
+        self.memory.last_cum_time = 0
+        
         self.character.tracker.add_to_timeline(
             f"Sesi Pelacur dimulai - {self.TOTAL_BOOKING_HOURS} jam di {location}",
             f"Harga: Rp{price:,}"
         )
-    
+        
         logger.info(f"🔥 Pelacur session started: {self.TOTAL_BOOKING_HOURS}h at {location}")
         logger.info(f"   Booking ends at: {time.ctime(self.booking_end_time)}")
-    
+        
         return self._build_start_confirmation()
