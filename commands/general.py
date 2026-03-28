@@ -1,10 +1,11 @@
 # commands/general.py
 """
 General Commands NovaService
-/start, /help, /status, /nova, /batal
+/start, /help, /status, /nova, /batal, /pause, /resume
 """
 
 import logging
+import time
 from datetime import datetime
 from telegram import Update
 from telegram.ext import ContextTypes, CommandHandler
@@ -34,6 +35,8 @@ async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         "• `/role therapist` - Panggil therapist (Anya/Syifa/Laura/Tara/Pevita/Maudy/Zara/Angela)\n"
         "• `/role pelacur` - Panggil pelacur (Davina/Michelle/Jihane/Tissa/Hana/Shindy/Nadya/Alyssa)\n"
         "• `/status` - Lihat status\n"
+        "• `/pause` - Hentikan sesi sementara\n"
+        "• `/resume` - Lanjutkan sesi\n"
         "• `/help` - Bantuan lengkap\n"
         "• `/batal` - Kembali ke mode chat\n\n"
         "Nikmati, Mas. 💜",
@@ -50,9 +53,17 @@ async def nova_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text("Maaf, Nova cuma untuk Mas. 💜")
         return
     
+    # Hentikan auto-send jika ada
+    try:
+        from handlers.message import _stop_auto_send
+        await _stop_auto_send(user_id)
+    except ImportError:
+        pass
+    except Exception as e:
+        logger.error(f"Error stopping auto-send: {e}")
+    
     await set_user_mode(user_id, 'chat', None)
     
-    from datetime import datetime
     hour = datetime.now().hour
     
     if 5 <= hour < 11:
@@ -93,7 +104,9 @@ async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         "• `/role pelacur` - Panggil pelacur random\n"
         "• 8 karakter: Davina, Michelle, Jihane, Tissa, Hana, Shindy, Nadya, Alyssa\n"
         "• Full booking 10 jam, Mas bebas climax berapa kali\n\n"
-        "*Umum:*\n"
+        "*Manajemen Sesi:*\n"
+        "• `/pause` - Hentikan sesi sementara (timer berhenti)\n"
+        "• `/resume` - Lanjutkan sesi (timer jalan lagi)\n"
         "• `/batal` - Kembali ke mode chat\n\n"
         "Selamat menikmati, Mas. 💜",
         parse_mode='Markdown'
@@ -112,9 +125,8 @@ async def status_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     active_role = await get_active_role(user_id)
     
     if mode == 'role' and active_role:
-        from roles.manager import get_role_manager
-        role_manager = get_role_manager()
-        role = role_manager.get_role(user_id)
+        from commands.role import get_user_role
+        role = get_user_role(user_id)
         
         if role:
             status_text = role.get_status()
@@ -138,11 +150,159 @@ async def batal_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if user_id != settings.admin_id:
         return
     
+    # Hentikan auto-send jika ada
+    try:
+        from handlers.message import _stop_auto_send
+        await _stop_auto_send(user_id)
+    except ImportError:
+        pass
+    except Exception as e:
+        logger.error(f"Error stopping auto-send: {e}")
+    
     await set_user_mode(user_id, 'chat', None)
     
     await update.message.reply_text(
         "💜 *KEMBALI KE NOVA* 💜\n\n"
         "Nova di sini, Mas. Ada yang bisa dibantu?",
+        parse_mode='Markdown'
+    )
+
+
+# =============================================================================
+# PAUSE & RESUME COMMANDS
+# =============================================================================
+
+async def pause_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Handler /pause - Hentikan sesi sementara (timer berhenti)"""
+    user_id = update.effective_user.id
+    settings = get_settings()
+    
+    if user_id != settings.admin_id:
+        return
+    
+    mode = await get_user_mode(user_id)
+    active_role = await get_active_role(user_id)
+    
+    if mode != 'role' or not active_role:
+        await update.message.reply_text(
+            "💜 Tidak ada role yang aktif.\n\n"
+            "Gunakan `/role therapist` atau `/role pelacur` untuk mulai, Mas.",
+            parse_mode='Markdown'
+        )
+        return
+    
+    from commands.role import get_user_flow
+    flow = get_user_flow(user_id)
+    
+    if not flow:
+        await update.message.reply_text(
+            "❌ Flow tidak ditemukan. Silakan pilih role lagi, Mas.",
+            parse_mode='Markdown'
+        )
+        return
+    
+    # Cek apakah flow punya atribut is_paused
+    if hasattr(flow, 'is_paused') and flow.is_paused:
+        await update.message.reply_text(
+            "💜 Sesi sudah dalam keadaan pause.\n\n"
+            "Kirim `/resume` untuk lanjutkan.",
+            parse_mode='Markdown'
+        )
+        return
+    
+    # Pause sesi
+    flow.is_paused = True
+    flow.pause_start_time = time.time()
+    
+    # Hentikan auto-send
+    try:
+        from handlers.message import _stop_auto_send
+        await _stop_auto_send(user_id)
+    except ImportError:
+        pass
+    except Exception as e:
+        logger.error(f"Error stopping auto-send: {e}")
+    
+    await update.message.reply_text(
+        "⏸️ *SESI DI-PAUSE* ⏸️\n\n"
+        "Waktu dihentikan sementara.\n\n"
+        "Kirim `/resume` untuk lanjutkan sesi.",
+        parse_mode='Markdown'
+    )
+
+
+async def resume_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Handler /resume - Lanjutkan sesi yang di-pause"""
+    user_id = update.effective_user.id
+    settings = get_settings()
+    
+    if user_id != settings.admin_id:
+        return
+    
+    mode = await get_user_mode(user_id)
+    active_role = await get_active_role(user_id)
+    
+    if mode != 'role' or not active_role:
+        await update.message.reply_text(
+            "💜 Tidak ada role yang aktif.\n\n"
+            "Gunakan `/role therapist` atau `/role pelacur` untuk mulai, Mas.",
+            parse_mode='Markdown'
+        )
+        return
+    
+    from commands.role import get_user_flow
+    flow = get_user_flow(user_id)
+    
+    if not flow:
+        await update.message.reply_text(
+            "❌ Flow tidak ditemukan. Silakan pilih role lagi, Mas.",
+            parse_mode='Markdown'
+        )
+        return
+    
+    if not hasattr(flow, 'is_paused') or not flow.is_paused:
+        await update.message.reply_text(
+            "💜 Tidak ada sesi yang di-pause.\n\n"
+            "Gunakan `/pause` untuk menghentikan sesi sementara.",
+            parse_mode='Markdown'
+        )
+        return
+    
+    # Hitung durasi pause
+    pause_duration = time.time() - flow.pause_start_time
+    
+    # Resume sesi - adjust timer (untuk therapist flow)
+    if hasattr(flow, 'back_area_start_time') and flow.back_area_start_time > 0:
+        flow.back_area_start_time += pause_duration
+    if hasattr(flow, 'front_area_start_time') and flow.front_area_start_time > 0:
+        flow.front_area_start_time += pause_duration
+    if hasattr(flow, 'area_start_time') and flow.area_start_time > 0:
+        flow.area_start_time += pause_duration
+    if hasattr(flow, 'phase_start_time') and flow.phase_start_time > 0:
+        flow.phase_start_time += pause_duration
+    
+    # Untuk pelacur flow
+    if hasattr(flow, 'area_start_time') and flow.area_start_time > 0:
+        flow.area_start_time += pause_duration
+    
+    flow.is_paused = False
+    
+    # Mulai auto-send lagi
+    try:
+        from handlers.message import _start_auto_send
+        await _start_auto_send(user_id, flow, context)
+    except ImportError:
+        pass
+    except Exception as e:
+        logger.error(f"Error starting auto-send: {e}")
+    
+    minutes = int(pause_duration // 60)
+    seconds = int(pause_duration % 60)
+    
+    await update.message.reply_text(
+        f"▶️ *SESI DILANJUTKAN* ▶️\n\n"
+        f"Pause selama {minutes} menit {seconds} detik.\n\n"
+        "Melanjutkan service...",
         parse_mode='Markdown'
     )
 
@@ -154,3 +314,6 @@ def register_general_commands(app):
     app.add_handler(CommandHandler("help", help_command))
     app.add_handler(CommandHandler("status", status_command))
     app.add_handler(CommandHandler("batal", batal_command))
+    app.add_handler(CommandHandler("pause", pause_command))
+    app.add_handler(CommandHandler("resume", resume_command))
+    logger.info("✅ General commands registered: /start, /nova, /help, /status, /batal, /pause, /resume")
