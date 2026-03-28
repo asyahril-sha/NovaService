@@ -187,11 +187,11 @@ class TherapistFlow:
             return 0
         if self.current_phase in [ServicePhase.BACK_PUNGGUNG, ServicePhase.BACK_PINGGUL, ServicePhase.BACK_PAHA_BETIS]:
             elapsed = int(time.time() - self.back_area_start_time)
-            logger.debug(f"Back area elapsed: {elapsed} detik, phase: {self.current_phase}")
+            logger.info(f"Back area elapsed: {elapsed} detik, area: {self.back_areas[self.back_area_index]}, start_time: {self.back_area_start_time}")
             return elapsed
         else:
             elapsed = int(time.time() - self.front_area_start_time)
-            logger.debug(f"Front area elapsed: {elapsed} detik, phase: {self.current_phase}")
+            logger.info(f"Front area elapsed: {elapsed} detik, area: {self.front_areas[self.front_area_index]}, start_time: {self.front_area_start_time}")
             return elapsed
     
     def _should_send_next_scene(self) -> bool:
@@ -251,10 +251,10 @@ class TherapistFlow:
     def _is_area_complete(self) -> bool:
         """Cek apakah area sudah selesai (10 menit)"""
         elapsed = self._get_area_elapsed()
-        if elapsed >= self.AREA_DURATION:
-            logger.info(f"Area complete! elapsed={elapsed}, AREA_DURATION={self.AREA_DURATION}")
-            return True
-        return False
+        is_complete = elapsed >= self.AREA_DURATION
+        if is_complete:
+            logger.info(f"AREA COMPLETE! elapsed={elapsed}, AREA_DURATION={self.AREA_DURATION}")
+        return is_complete
     
     # =========================================================================
     # PRESSURE & SPEED METHODS
