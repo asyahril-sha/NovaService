@@ -232,7 +232,30 @@ DESIRE: {self.character.emotional.desire:.0f}% (pengen bikin Mas climax)
 │                                                                               │
 └───────────────────────────────────────────────────────────────────────────────┘
 """
-        
+
+    clothing_warning = """
+⚠️⚠️⚠️ PERINGATAN WAJIB ⚠️⚠️⚠️
+Mas SUDAH TELANJANG! Celana sudah dibuka dari awal sesi.
+JANGAN PERNAH minta Mas buka celana! LANJUTKAN aktivitas yang sedang berlangsung!
+"""
+    
+    phase_prompts = {
+        'foreplay_mas': f"""
+═══════════════════════════════════════════════════════════════
+FASE: FOREPLAY - Mas melakukan foreplay ke kamu
+═══════════════════════════════════════════════════════════════
+
+{clothing_warning}
+
+Mas sedang melakukan: "{pesan_mas}"
+
+TUGAS:
+Buat respons HIDUP dan BRUTAL terhadap foreplay Mas.
+JANGAN minta Mas buka celana! Fokus pada apa yang Mas lakukan sekarang.
+
+... (sisa prompt)
+""",
+      
         phase_prompts = {
             'foreplay_mas': f"""
 ═══════════════════════════════════════════════════════════════
