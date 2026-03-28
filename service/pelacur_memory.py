@@ -70,8 +70,128 @@ class PelacurMemory:
         self.cum_count: int = 0  # Sudah berapa kali climax
         self.cum_locations: List[str] = []  # Di mana climax terjadi
         self.last_cum_time: float = 0
+
+        # ========== TAMBAHKAN INI ==========
+        self.last_mas_action: Optional[str] = None
+        self.last_role_response: Optional[str] = None
+        self.last_touch_area: Optional[str] = None
+        self.last_compliment: Optional[str] = None
+        self.position_request: Optional[str] = None
+        self.intimacy_moments: List[Dict] = []
         
         logger.info(f"🧠 PelacurMemory initialized for {character_name}")
+
+    # service/pelacur_memory.py
+    # Tambahkan method ini di dalam class PelacurMemory
+
+    # service/pelacur_memory.py
+# Tambahkan method ini di dalam class PelacurMemory
+
+def update_from_mas(self, pesan_mas: str):
+    """
+    Update memory dari pesan Mas
+    Method ini dipanggil setiap kali ada pesan dari Mas
+    """
+    self.last_mas_action = pesan_mas
+    self.last_action_time = time.time()
+    
+    pesan_lower = pesan_mas.lower()
+    
+    # Deteksi area sentuhan
+    touch_areas = ['paha', 'dada', 'payudara', 'toket', 'pinggul', 'pantat', 'memek', 'klitoris', 'kontol']
+    for area in touch_areas:
+        if area in pesan_lower:
+            self.last_touch_area = area
+            break
+    
+    # Deteksi pujian
+    compliments = ['enak', 'mantap', 'bagus', 'hebat', 'keren', 'sexy', 'cantik', 'hot', 'sange']
+    for comp in compliments:
+        if comp in pesan_lower:
+            self.last_compliment = comp
+            self.intimacy_moments.append({
+                'type': 'compliment',
+                'content': comp,
+                'time': time.time()
+            })
+            break
+    
+    # Deteksi request ganti posisi
+    positions = ['cowgirl', 'missionary', 'doggy', 'spooning', 'standing', 'sitting', 'sofa', 'berdiri']
+    for pos in positions:
+        if pos in pesan_lower:
+            self.position_request = pos
+            break
+
+
+def update_from_response(self, response: str, phase: str):
+    """
+    Update memory dari response role
+    Method ini dipanggil setelah AI generate response
+    """
+    self.last_role_response = response
+    self.last_action_time = time.time()
+    
+    response_lower = response.lower()
+    
+    # Deteksi posisi dari response
+    positions = {
+        'cowgirl': ['cowgirl', 'duduk di atas', 'naik turun'],
+        'missionary': ['missionary', 'telentang'],
+        'doggy': ['doggy', 'merangkak', 'dari belakang'],
+        'spooning': ['spooning', 'menyamping'],
+        'standing': ['berdiri', 'standing'],
+        'sitting': ['duduk', 'sitting', 'sofa']
+    }
+    
+    for pos, keywords in positions.items():
+        if any(k in response_lower for k in keywords):
+            self.last_position = pos
+            break
+    
+    # Deteksi gerakan
+    movements = {
+        'naik turun': ['naik turun', 'naik-turun'],
+        'maju mundur': ['maju mundur', 'gesek'],
+        'bergoyang': ['bergoyang', 'goyang'],
+        'berputar': ['berputar', 'putar']
+    }
+    
+    for movement, keywords in movements.items():
+        if any(k in response_lower for k in keywords):
+            self.last_movement = movement
+            break
+    
+    # Deteksi kecepatan
+    if any(k in response_lower for k in ['cepat', 'kencang']):
+        self.last_speed = 'cepat'
+    elif any(k in response_lower for k in ['pelan', 'lambat']):
+        self.last_speed = 'pelan'
+    
+    # Deteksi kondisi tubuh
+    if any(k in response_lower for k in ['napas putus-putus', 'putus-putus']):
+        self.body_state['napas'] = 'putus-putus'
+    elif any(k in response_lower for k in ['napas tersengal', 'tersengal']):
+        self.body_state['napas'] = 'tersengal'
+    elif any(k in response_lower for k in ['napas berat', 'berat']):
+        self.body_state['napas'] = 'berat'
+    
+    if 'gemetar' in response_lower:
+        self.body_state['gemetar'] = True
+    
+    # Deteksi perasaan
+    feelings = ['enak', 'nikmat', 'puas', 'sange', 'capek', 'lelah']
+    for feeling in feelings:
+        if feeling in response_lower:
+            self.current_feeling = feeling
+            break
+    
+    # Simpan ke conversation context
+    self.conversation_context.append({
+        'role': response[:200],
+        'time': self.last_action_time,
+        'phase': phase
+    })
     
     # =========================================================================
     # POSITION MEMORY
