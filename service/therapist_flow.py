@@ -51,6 +51,9 @@ class TherapistFlow:
         self.character = character
         self.prompt_builder = get_prompt_builder()
         self._ai_client = None
+
+        self.used_phrases = []  # Simpan kalimat yang sudah dipakai
+        self.max_phrase_history = 10
         
         # ========== STATE TRACKING ==========
         self.is_active = False
@@ -291,6 +294,19 @@ class TherapistFlow:
             elapsed_minutes,
             total_scenes
         )
+        # CEK APAKAH ADA KALIMAT YANG DIULANG
+        for phrase in self.used_phrases:
+            if phrase in scene and len(phrase) > 20:
+                logger.warning(f"Phrase repetition detected: {phrase[:50]}")
+                # Regenerate dengan variasi
+                return await self._generate_back_scene(area, pressure, scene_num, elapsed_minutes)
+    
+        # Simpan kalimat unik
+        self.used_phrases.append(scene[:100])
+        if len(self.used_phrases) > self.max_phrase_history:
+            self.used_phrases.pop(0)
+    
+        return scene
         
         return await self._generate_scene(prompt)
     
@@ -586,8 +602,6 @@ class TherapistFlow:
     # =========================================================================
     
     async def _process_back_massage(self, pesan_mas: str) -> Optional[str]:
-        current_area = self.back_areas[self.back_area_index]
-        elapsed = self._get_area_elapsed()
         """
         Process pesan Mas dalam fase pijat belakang
         Returns: response atau None jika perlu auto-send scene
@@ -604,7 +618,7 @@ class TherapistFlow:
             return None
         
         # ========== CEK APAKAH AREA SUDAH SELESAI (10 MENIT) ==========
-        if self._is_area_complete():
+        if elapsed >= 600:  # 10 menit = 600 detik
             self.waiting_for_response = True
             self.waiting_for_type = "next_area"
             self.waiting_start_time = time.time()
@@ -667,18 +681,17 @@ class TherapistFlow:
                 return self._build_confirmation_pressure()
         
         # ========== KONFIRMASI PINDAH AREA ==========
-        elif self.waiting_for_type == "next_area":
+        if self.waiting_for_type == "next_area":
             if any(k in msg_lower for k in ["lanjut", "ya", "ok", "gas", "iya"]):
                 self.waiting_for_response = False
-                return await self._next_back_area()
-            
+                return await self._next_back_area()  # ← PINDAH AREA
+        
             elif any(k in msg_lower for k in ["tidak", "nggak", "gak", "stop"]):
-                # Mas mau berhenti, end session
                 self.waiting_for_response = False
                 return self._build_end_session()
             
-            else:
-                return self._build_confirmation_next_area(current_area)
+                else:
+                    return self._build_confirmation_next_area(current_area)
         
         return None
     
