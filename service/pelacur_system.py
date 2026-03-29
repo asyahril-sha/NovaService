@@ -868,7 +868,7 @@ class PelacurSystem(PelacurAuto, PelacurManual):
         intimate_level = getattr(self, 'intimate_level', 1)
         intimate_phase = getattr(self, 'intimate_phase', 'stranger')
     
-    return f"""
+        return f"""
 ╔══════════════════════════════════════════════════════════════╗
 ║                 💜 STATUS SESI PELACUR 💜                     ║
 ╠══════════════════════════════════════════════════════════════╣
