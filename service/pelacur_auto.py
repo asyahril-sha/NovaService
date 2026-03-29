@@ -162,6 +162,9 @@ class PelacurAuto(PelacurCore):
         scene_num = self.scene_count
         total_scenes = self.BJ_SCENES
 
+        # ✅ Dapatkan memory context TERLEBIH DAHULU
+        memory_context = self.memory.get_full_context()
+
         # ✅ TAMBAHKAN PENGINGAT POSISI
         position_reminder = """
 ⚠️ POSISI SAAT INI: KAMU SEDANG BERLUTUT DI DEPAN MAS
@@ -169,28 +172,14 @@ AKTIVITAS: MENGHISAP KONTOL MAS (BLOWJOB)
 JANGAN BERUBAH POSISI! JANGAN DUDUK DI ATAS!
 FOKUS: GERAKAN MULUT, LIDAH, HISAPAN
 """
+
+        # Build prompt menggunakan prompt builder
+        prompt = self.prompt_builder.build_auto_prompt("bj", scene_num, total_scenes)
     
-    full_prompt = f"""
+        full_prompt = f"""
 {memory_context}
 
 {position_reminder}
-
-- Ini adalah scene ke-{scene_num} dari {total_scenes} scene BJ
-...
-"""
-        
-        # Update emotional state
-        self._update_emotional_state()
-        
-        # Dapatkan konteks memory
-        memory_context = self.memory.get_full_context()
-        
-        # Build prompt menggunakan prompt builder yang sudah ada
-        prompt = self.prompt_builder.build_auto_prompt("bj", scene_num, total_scenes)
-        
-        # Tambahkan memory context
-        full_prompt = f"""
-{memory_context}
 
 ═══════════════════════════════════════════════════════════════
 INSTRUKSI KHUSUS UNTUK SCENE INI:
@@ -204,8 +193,10 @@ INSTRUKSI KHUSUS UNTUK SCENE INI:
 
 RESPON KAMU (narasi BJ, bukan jawaban AI):
 """
-        
-        return await self._generate_scene(full_prompt)
+    
+        scene = await self._generate_scene(full_prompt)
+        scene = self._clean_markdown(scene)
+        return scene
     
     # =========================================================================
     # KISSING AUTO PHASE
