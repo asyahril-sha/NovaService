@@ -1650,7 +1650,7 @@ RESPON KAMU (narasi bercinta, bukan jawaban AI):
     
         intimate_info = f"Fase Intim: {self.intimate_phase.upper()} (Level {self.intimate_level}/12) | Keintiman: {self.intimacy_build_up}%"
     
-    return f"""
+        return f"""
 ╔══════════════════════════════════════════════════════════════╗
 ║                    💆 THERAPIST SESSION                       ║
 ╠══════════════════════════════════════════════════════════════╣
