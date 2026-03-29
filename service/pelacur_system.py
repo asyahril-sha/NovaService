@@ -129,42 +129,67 @@ class PelacurSystem(PelacurAuto, PelacurManual):
     async def _check_mas_climax(self, pesan_mas: str) -> Optional[str]:
         """
         Deteksi climax Mas dari pesan
-        Mas bisa climax kapan saja, langsung terdeteksi
+        Format yang dideteksi:
+        - "aku mau keluar" / "mas mau keluar"
+        - "aku mau crot" / "mas mau crot"
+        - "aku mau climax" / "mas mau climax"
         """
         msg_lower = pesan_mas.lower()
-        
-        climax_keywords = ['climax', 'crot', 'keluar', 'habis', 'meletus', 'cumi', 'keluar']
-        
-        if not any(k in msg_lower for k in climax_keywords):
+    
+        # Kata pembatal (belum mau climax)
+        cancel_keywords = ['jangan', 'tahan', 'belum', 'stop', 'berhenti', 'nggak mau', 'gak mau']
+        if any(k in msg_lower for k in cancel_keywords):
+            logger.info(f"🚫 Mas membatalkan climax: {pesan_mas[:50]}")
             return None
-        
-        # Deteksi apakah Mas bicara tentang climax
-        if 'aku' in msg_lower or 'mas' in msg_lower or 'gue' in msg_lower:
-            intensity = "heavy" if any(k in msg_lower for k in ['keras', 'banyak', 'kenceng', 'deras']) else "normal"
-            
-            self.mas_climax_count += 1
-            self.last_climax_time = time.time()
-            
-            # Deteksi lokasi climax yang diminta Mas
-            location = self._detect_cum_location(pesan_mas)
-            
-            # Record ke memory
-            self.memory.record_climax(is_mas=True, location=location, intensity=intensity)
-            
-            # Update emotional engine
-            self.character.emotional.add_stimulation("Mas climax", 8 if intensity == "heavy" else 5)
-            
-            # Build climax scene
-            climax_scene = self._build_climax_scene(is_mas=True, intensity=intensity, location=location)
-            
-            # Simpan ke scene context
-            self.scene_context.append(f"MAS CLIMAX #{self.mas_climax_count} at {location}")
-            
-            logger.info(f"💦 MAS CLIMAX #{self.mas_climax_count} - location: {location}")
-            
-            return climax_scene
-        
-        return None
+    
+        # Pola yang diterima
+        patterns = [
+            'aku mau keluar', 'mas mau keluar',
+            'aku mau keluarin', 'mas mau keluarin',
+            'aku mau crot', 'mas mau crot',
+            'aku mau climax', 'mas mau climax'
+        ]
+    
+        is_climax = False
+        intensity = "normal"
+    
+        for pattern in patterns:
+            if pattern in msg_lower:
+                is_climax = True
+                if any(k in msg_lower for k in ['keras', 'banyak', 'kenceng', 'deras']):
+                    intensity = "heavy"
+                break
+    
+        if not is_climax:
+            return None
+    
+        # Proses climax
+        return await self._process_mas_climax(intensity, pesan_mas)
+
+    async def _process_mas_climax(self, intensity: str, pesan_mas: str) -> str:
+        """Proses climax Mas"""
+    
+        self.mas_climax_count += 1
+        self.last_climax_time = time.time()
+    
+        # Deteksi lokasi climax
+        location = self._detect_cum_location(pesan_mas)
+    
+        # Record ke memory
+        self.memory.record_climax(is_mas=True, location=location, intensity=intensity)
+    
+        # Update emotional engine
+        self.character.emotional.add_stimulation("Mas climax", 8 if intensity == "heavy" else 5)
+    
+        # Build climax scene
+        climax_scene = self._build_climax_scene(is_mas=True, intensity=intensity, location=location)
+    
+        # Simpan ke scene context
+        self.scene_context.append(f"MAS CLIMAX #{self.mas_climax_count} at {location}")
+    
+        logger.info(f"💦 MAS CLIMAX #{self.mas_climax_count} - location: {location} (intensity: {intensity})")
+    
+        return climax_scene
     
     def _detect_cum_location(self, pesan_mas: str) -> str:
         """Deteksi lokasi climax yang diminta Mas"""
