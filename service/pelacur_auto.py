@@ -7,7 +7,6 @@ Auto send scene setiap 30 detik
 import asyncio
 import time
 import logging
-import re
 from typing import Optional
 
 from service.pelacur_core import PelacurCore
@@ -21,25 +20,6 @@ class PelacurAuto(PelacurCore):
     - BJ: 30 menit, auto scene setiap 30 detik
     - Kissing: 30 menit, auto scene setiap 30 detik
     """
-
-    def _clean_markdown(self, text: str) -> str:
-        """Bersihkan markdown yang tidak lengkap sebelum dikirim ke Telegram"""
-        import re
-        
-        asterisk_count = text.count('*')
-        underscore_count = text.count('_')
-    
-        if asterisk_count % 2 != 0:
-            text = re.sub(r'\*([^*]*)$', r'\1', text)
-    
-        if underscore_count % 2 != 0:
-            text = re.sub(r'_([^_]*)$', r'\1', text)
-    
-        special_chars = ['[', ']', '(', ')', '\\', '`']
-        for char in special_chars:
-            text = text.replace(char, f'\\{char}')
-    
-        return text
     
     # =========================================================================
     # AUTO SEND TASK MANAGEMENT
@@ -69,33 +49,39 @@ class PelacurAuto(PelacurCore):
         """Loop background untuk auto-send scene"""
         while self.auto_send_running and self.is_active and self.auto_send_active:
             try:
+                # Cek jika sedang menunggu respons, jangan kirim scene
                 if self.waiting_for_response:
                     await asyncio.sleep(1)
                     continue
-            
+                
+                # Cek apakah fase auto sudah selesai
                 if self._is_auto_phase_complete():
                     logger.info(f"✅ Auto phase {self.current_phase_name} completed")
                     await self._stop_auto_send_task()
                     await self._on_auto_phase_complete()
                     break
-            
+                
+                # Cek apakah perlu kirim scene berikutnya
                 if self._should_send_next_auto_scene():
                     scene = await self._generate_current_auto_scene()
                     if scene:
                         logger.info(f"📤 Auto-send scene #{self.scene_count}")
-                    
+                        # ✅ PERUBAHAN: Hanya 1 baris ini yang diubah!
+                        # Sebelum: if hasattr(self.character, 'send_message'): await self.character.send_message(scene)
+                        # Sesudah:
                         self._pending_scene = scene
-                    
+                        
+                        # Simpan ke memory
                         self.memory.record_action(f"auto_scene_{self.current_phase_name}", scene)
                         self.memory.update_from_response(scene, self.current_phase_name)
-            
-                await asyncio.sleep(1)
-            
+                
+                await asyncio.sleep(1)  # Check setiap detik
+                
             except asyncio.CancelledError:
                 break
             except Exception as e:
                 logger.error(f"Auto-send loop error: {e}")
-                await asyncio.sleep(5)                 
+                await asyncio.sleep(5)
     
     async def _generate_current_auto_scene(self) -> str:
         """Generate scene untuk auto phase saat ini"""
@@ -110,9 +96,11 @@ class PelacurAuto(PelacurCore):
         self.auto_send_active = False
         
         if self.current_phase_name == "bj":
+            # BJ selesai, lanjut ke kissing
             logger.info("BJ completed, moving to kissing phase")
             await self._start_kissing_auto()
         elif self.current_phase_name == "kissing":
+            # Kissing selesai, lanjut ke foreplay manual
             logger.info("Kissing completed, moving to foreplay manual")
             self.auto_send_active = False
             self.current_phase_name = "foreplay_mas"
@@ -139,14 +127,20 @@ class PelacurAuto(PelacurCore):
         self.auto_send_active = True
         self.waiting_for_response = False
         
+        # Update posisi di memory
         self.memory.update_position("berlutut di antara kaki Mas", "bj")
         self.memory.update_movement("menghisap", "sedang")
+        
+        # Update body state
         self.memory.update_body_state(napas='stabil', suhu='normal')
         
+        # Start auto-send task
         await self._start_auto_send_task()
         
+        # Generate scene pertama
         first_scene = await self._generate_bj_auto_scene()
         
+        # Simpan ke memory
         self.memory.record_action("start_bj", first_scene)
         self.memory.update_from_response(first_scene, "bj")
         
@@ -156,11 +150,17 @@ class PelacurAuto(PelacurCore):
         """Generate scene BJ auto menggunakan AI"""
         scene_num = self.scene_count
         total_scenes = self.BJ_SCENES
-    
+        
+        # Update emotional state
         self._update_emotional_state()
+        
+        # Dapatkan konteks memory
         memory_context = self.memory.get_full_context()
+        
+        # Build prompt menggunakan prompt builder yang sudah ada
         prompt = self.prompt_builder.build_auto_prompt("bj", scene_num, total_scenes)
         
+        # Tambahkan memory context
         full_prompt = f"""
 {memory_context}
 
@@ -177,9 +177,7 @@ INSTRUKSI KHUSUS UNTUK SCENE INI:
 RESPON KAMU (narasi BJ, bukan jawaban AI):
 """
         
-        scene = await self._generate_scene(full_prompt)
-        scene = self._clean_markdown(scene)
-        return scene
+        return await self._generate_scene(full_prompt)
     
     # =========================================================================
     # KISSING AUTO PHASE
@@ -196,15 +194,21 @@ RESPON KAMU (narasi BJ, bukan jawaban AI):
         self.auto_send_active = True
         self.waiting_for_response = False
         
+        # Update posisi di memory
         self.memory.update_position("duduk di atas kontol Mas", "kissing")
         self.memory.update_movement("menggesek", "sedang")
+        
+        # Update body state
         self.memory.update_body_state(napas='berat', suhu='hangat')
         self.memory.update_feeling('sange', 50)
         
+        # Start auto-send task
         await self._start_auto_send_task()
         
+        # Generate scene pertama
         first_scene = await self._generate_kissing_auto_scene()
         
+        # Simpan ke memory
         self.memory.record_action("start_kissing", first_scene)
         self.memory.update_from_response(first_scene, "kissing")
         
@@ -214,11 +218,17 @@ RESPON KAMU (narasi BJ, bukan jawaban AI):
         """Generate scene kissing auto menggunakan AI"""
         scene_num = self.scene_count
         total_scenes = self.KISSING_SCENES
-    
+        
+        # Update emotional state
         self._update_emotional_state()
+        
+        # Dapatkan konteks memory
         memory_context = self.memory.get_full_context()
+        
+        # Build prompt menggunakan prompt builder yang sudah ada
         prompt = self.prompt_builder.build_auto_prompt("kissing", scene_num, total_scenes)
         
+        # Tambahkan memory context
         full_prompt = f"""
 {memory_context}
 
@@ -235,16 +245,15 @@ INSTRUKSI KHUSUS UNTUK SCENE INI:
 RESPON KAMU (narasi kissing + gesekan, bukan jawaban AI):
 """
         
-        scene = await self._generate_scene(full_prompt)
-        scene = self._clean_markdown(scene)
-        return scene
+        return await self._generate_scene(full_prompt)
     
     # =========================================================================
-    # FOREPLAY REQUEST
+    # FOREPLAY REQUEST (Transisi ke manual)
     # =========================================================================
     
     async def _build_foreplay_request(self) -> str:
-        """Bangun pesan minta Mas foreplay"""
+        """Bangun pesan minta Mas foreplay (natural)"""
+        # Update perasaan
         self.memory.update_feeling('pengen disentuh', 70)
         
         return f"""*{self.character.name} berhenti bergerak, napasnya masih tersengal. Tubuhnya masih hangat, matanya sayu menatap Mas.*
