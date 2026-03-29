@@ -588,10 +588,18 @@ class PelacurSystem(PelacurAuto, PelacurManual):
                 return response
             
             # ========== AUTO SEND ACTIVE ==========
+            # Di method process(), saat auto-send active
             if self.auto_send_active:
                 response = await self._process_auto_phase()
                 if response:
-                    self.scene_context.append(f"Auto scene: {response[:50]}...")
+                    logger.info(f"📤 Auto-send response length: {len(response)} chars")
+                    # Kirim dengan parse_mode None untuk menghindari markdown error
+                    if hasattr(self.character, 'send_message'):
+                        try:
+                            await self.character.send_message(response, parse_mode=None)
+                        except Exception as e:
+                            logger.error(f"❌ Failed to send in process: {e}")
+                    self.scene_context.append(f"Auto scene: {response[:100]}...")
                 return response
             
             # ========== AFTERCARE ACTIVE ==========
