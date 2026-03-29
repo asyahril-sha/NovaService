@@ -512,7 +512,7 @@ class SceneBuilder:
 """
 Brutal Scenes NovaService - Scene dengan intensitas maksimal
 Dirty talk, deskripsi eksplisit, bikin Mas sange parah
-Untuk karakter dengan dominance tinggi: Davina, Jihane, Hana, Alyssa, Laura
+Untuk karakter dengan dominance tinggi: Davina, Jihane, Hana, Sallsa, Laura
 """
 
 import random
