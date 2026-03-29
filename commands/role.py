@@ -385,7 +385,7 @@ async def cmd_status(update: Update, context: ContextTypes.DEFAULT_TYPE):
     
     mode = await get_user_mode(user_id)
     active_role = await get_active_role(user_id)
-    flow = get_user_flow(user_id)
+    flow = await get_user_flow(user_id)
     
     if mode != 'role' or not active_role or not flow:
         await update.message.reply_text(
@@ -398,15 +398,14 @@ async def cmd_status(update: Update, context: ContextTypes.DEFAULT_TYPE):
     
     # Cek apakah flow punya method get_status
     if hasattr(flow, 'get_status'):
-        status_text = flow.get_status()  # ← PANGGIL METHOD INI
+        status_text = flow.get_status()
         await update.message.reply_text(status_text, parse_mode='Markdown')
     else:
         status_text = f"✅ *Sesi {active_role} sedang aktif*\n\n"
         if hasattr(flow, 'character'):
             status_text += f"👤 Karakter: {flow.character.name}\n"
         status_text += f"\nKetik /batal untuk mengakhiri sesi."
-    
-       await update.message.reply_text(status_text, parse_mode='Markdown')
+        await update.message.reply_text(status_text, parse_mode='Markdown')
     
 # =============================================================================
 # REGISTER FUNCTION
