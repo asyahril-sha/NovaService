@@ -47,28 +47,36 @@ class PelacurAuto(PelacurCore):
     
     async def _auto_send_loop(self):
         """Loop background untuk auto-send scene"""
+    
+        # ✅ TUNGGU CALLBACK SIAP (max 5 detik)
+        wait_count = 0
+        while not self._send_callback and wait_count < 50:  # 5 detik
+            await asyncio.sleep(0.1)
+            wait_count += 1
+    
+        if not self._send_callback:
+            logger.error("❌ Send callback not available after waiting!")
+            return
+    
+        logger.info("✅ Send callback ready, starting auto-send loop")
+    
         while self.auto_send_running and self.is_active and self.auto_send_active:
             try:
-                # Cek jika sedang menunggu respons, jangan kirim scene
                 if self.waiting_for_response:
                     await asyncio.sleep(1)
                     continue
-                
-                # Cek apakah fase auto sudah selesai
+            
                 if self._is_auto_phase_complete():
                     logger.info(f"✅ Auto phase {self.current_phase_name} completed")
                     await self._stop_auto_send_task()
                     await self._on_auto_phase_complete()
                     break
-                
-                # Cek apakah perlu kirim scene berikutnya
+            
                 if self._should_send_next_auto_scene():
                     scene = await self._generate_current_auto_scene()
                     if scene:
                         logger.info(f"📤 Auto-send scene #{self.scene_count}")
-                        # ✅ PERUBAHAN: Hanya 1 baris ini yang diubah!
-                        # Sebelum: if hasattr(self.character, 'send_message'): await self.character.send_message(scene)
-                        # Sesudah:
+                    
                         if self._send_callback:
                             try:
                                 await self._send_callback(scene)
@@ -77,13 +85,9 @@ class PelacurAuto(PelacurCore):
                                 logger.error(f"❌ Send callback failed: {e}")
                         else:
                             logger.error("❌ No send callback available!")
-                        
-                        # Simpan ke memory
-                        self.memory.record_action(f"auto_scene_{self.current_phase_name}", scene)
-                        self.memory.update_from_response(scene, self.current_phase_name)
-                
-                await asyncio.sleep(1)  # Check setiap detik
-                
+            
+                await asyncio.sleep(1)
+            
             except asyncio.CancelledError:
                 break
             except Exception as e:
