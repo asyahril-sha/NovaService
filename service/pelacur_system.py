@@ -824,6 +824,74 @@ class PelacurSystem(PelacurAuto, PelacurManual):
             self.conversation_history.pop(0)
         
         return response
+
+    def get_status(self) -> str:
+        """Dapatkan status sesi pelacur saat ini untuk ditampilkan ke user"""
+    
+        # Status fase
+        phase_names = {
+            "confirmation": "⏳ Menunggu konfirmasi mulai",
+            "bj": "👄 BJ (Blowjob) - Auto",
+            "kissing": "💋 Kissing + Gesek - Auto",
+            "foreplay_mas": "🖐️ Foreplay - Manual Mode",
+            "cowgirl": "🐄 Cowgirl - Manual Mode",
+            "cunnilingus": "👅 Cunnilingus - Manual Mode",
+            "missionary": "🛏️ Missionary - Manual Mode",
+            "doggy": "🐕 Doggy - Manual Mode",
+            "position_change": "🔄 Ganti Posisi - Manual Mode",
+            "aftercare": "💕 Aftercare"
+        }
+    
+        phase_display = phase_names.get(self.current_phase_name, self.current_phase_name)
+    
+        # Progress
+        if self.current_phase_name == "bj":
+            progress = f"{self.scene_count}/{self.BJ_SCENES} scene ({self._get_phase_elapsed() // 60}/{self.BJ_DURATION//60} menit)"
+        elif self.current_phase_name == "kissing":
+            progress = f"{self.scene_count}/{self.KISSING_SCENES} scene ({self._get_phase_elapsed() // 60}/{self.KISSING_DURATION//60} menit)"
+        elif self.current_phase_name == "foreplay_mas":
+            progress = "Menunggu input Mas..."
+        elif self.current_phase_name in ["cowgirl", "cunnilingus", "missionary", "doggy", "position_change", "aftercare"]:
+            progress = "Mode manual - berbalas pesan"
+        else:
+            progress = "-"
+    
+        # Waktu booking
+        remaining = self._get_remaining_time()
+        remaining_str = self._get_time_string(remaining)
+        elapsed_str = self._get_time_string(self._get_booking_elapsed())
+    
+        # Status auto-send
+        auto_status = "✅ Aktif" if self.auto_send_active else "⏸️ Tidak aktif"
+    
+        # Intimate level
+        intimate_level = getattr(self, 'intimate_level', 1)
+        intimate_phase = getattr(self, 'intimate_phase', 'stranger')
+    
+    return f"""
+╔══════════════════════════════════════════════════════════════╗
+║                 💜 STATUS SESI PELACUR 💜                     ║
+╠══════════════════════════════════════════════════════════════╣
+║                                                               ║
+║ 👤 Karakter: {self.character.name} ({self.character.age}th)                         ║
+║ 📍 Lokasi: {getattr(self.character, 'booking_location', 'belum diatur')}                    ║
+║                                                               ║
+║ 🎬 Fase saat ini: {phase_display}                             ║
+║ 📊 Progress: {progress}                                       ║
+║                                                               ║
+║ ⏰ Waktu berjalan: {elapsed_str}                              ║
+║ ⏳ Sisa waktu: {remaining_str}                                ║
+║                                                               ║
+║ 🔄 Auto-send: {auto_status}                                   ║
+║                                                               ║
+║ 💦 Climax:                                                    ║
+║    ├─ Mas climax: {self.mas_climax_count}x                            ║
+║    └─ Role climax: {self.role_climax_count}x                          ║
+║                                                               ║
+║ 💖 Keintiman: Level {intimate_level}/12 ({intimate_phase})           ║
+║                                                               ║
+╚══════════════════════════════════════════════════════════════╝
+"""
     
     # =========================================================================
     # START SESSION
