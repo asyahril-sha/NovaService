@@ -45,6 +45,9 @@ class PelacurSystem(PelacurAuto, PelacurManual):
         """Inisialisasi PelacurSystem dengan multiple inheritance"""
         # Panggil init dari parent classes
         super().__init__(character)
+
+        # ✅ TAMBAHKAN INI (WAJIB)
+        self._send_callback = None
         
         # ========== CONVERSATION HISTORY ==========
         self.conversation_history: List[str] = []           # History percakapan (50 max)
