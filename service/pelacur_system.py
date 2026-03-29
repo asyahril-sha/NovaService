@@ -961,3 +961,5 @@ class PelacurSystem(PelacurAuto, PelacurManual):
         logger.info(f"   Booking ends at: {time.ctime(self.booking_end_time)}")
         
         return self._build_start_confirmation()
+        
+
