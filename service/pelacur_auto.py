@@ -54,6 +54,12 @@ class PelacurAuto(PelacurCore):
         """Mulai background task untuk auto-send scene"""
         if self.auto_send_running:
             return
+
+        # CEK METHOD
+        if not hasattr(self, '_auto_send_loop'):
+            logger.error("❌ CRITICAL: _auto_send_loop method not found in PelacurAuto!")
+            logger.error(f"   Available methods: {[m for m in dir(self) if not m.startswith('_')]}")
+            return
         
         self.auto_send_running = True
         self.auto_send_task = asyncio.create_task(self._auto_send_loop())
