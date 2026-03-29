@@ -18,17 +18,17 @@ from telegram import Update
 from telegram.ext import (
     Application,
     ApplicationBuilder,
+    CommandHandler,
     MessageHandler,
     filters,
-    ContextTypes,
-    CommandHandler  # ✅ Tambahkan ini
+    ContextTypes
 )
 from telegram.request import HTTPXRequest
 
 from config import get_settings
 from commands import register_general_commands, register_role_commands
 from handlers.message import message_handler, set_nova_available
-from commands.role import cmd_status  # ✅ Tambahkan ini
+from commands.role import cmd_status
 
 __version__ = "1.0.0"
 
@@ -53,6 +53,195 @@ _backup_dir.mkdir(parents=True, exist_ok=True)
 # Flag untuk Nova availability
 NOVA_AVAILABLE = True
 set_nova_available(NOVA_AVAILABLE)
+
+
+# =============================================================================
+# COMMAND HANDLERS
+# =============================================================================
+
+async def cmd_start(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Handler untuk command /start"""
+    user_id = update.effective_user.id
+    settings = get_settings()
+    
+    if user_id != settings.admin_id:
+        await update.message.reply_text("❌ Maaf, Anda tidak memiliki akses ke bot ini.")
+        return
+    
+    # Cek apakah ada sesi aktif
+    from utils.user_mode import get_active_role, get_user_flow
+    active_role = await get_active_role(user_id)
+    flow = get_user_flow(user_id)
+    
+    if active_role and flow and flow.is_active:
+        await update.message.reply_text(
+            f"💜 *Sesi {active_role} masih berjalan!*\n\n"
+            f"Ketik /status untuk lihat status\n"
+            f"Ketik /batal untuk mengakhiri sesi\n"
+            f"Ketik /pause untuk jeda sejenak\n"
+            f"Ketik /resume untuk melanjutkan",
+            parse_mode='Markdown'
+        )
+        return
+    
+    await update.message.reply_text(
+        "💜 *NOVASERVICE* 💜\n\n"
+        "Selamat datang, Mas.\n\n"
+        "Command yang tersedia:\n"
+        "• /nova - Panggil Nova\n"
+        "• /role therapist - Panggil therapist\n"
+        "• /role pelacur - Panggil pelacur\n"
+        "• /status - Lihat status sesi\n"
+        "• /pause - Jeda sesi sementara\n"
+        "• /resume - Lanjutkan sesi\n"
+        "• /batal - Kembali ke mode chat\n\n"
+        "Nikmati, Mas. 💜",
+        parse_mode='Markdown'
+    )
+
+
+async def cmd_nova(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Handler untuk command /nova"""
+    user_id = update.effective_user.id
+    settings = get_settings()
+    
+    if user_id != settings.admin_id:
+        await update.message.reply_text("❌ Maaf, Anda tidak memiliki akses ke bot ini.")
+        return
+    
+    # Cek apakah ada sesi aktif
+    from utils.user_mode import get_active_role, get_user_flow
+    active_role = await get_active_role(user_id)
+    flow = get_user_flow(user_id)
+    
+    if active_role and flow and flow.is_active:
+        await update.message.reply_text(
+            f"💜 *Sesi {active_role} masih berjalan!*\n\n"
+            f"Ketik /status untuk lihat status\n"
+            f"Ketik /batal untuk mengakhiri sesi",
+            parse_mode='Markdown'
+        )
+        return
+    
+    # Reset ke mode chat
+    from utils.user_mode import set_user_mode
+    await set_user_mode(user_id, 'chat')
+    
+    await update.message.reply_text(
+        "*Nova tersenyum*\n\n\"Iya, Mas. Ada yang bisa Nova bantu?\"\n\n"
+        "Ketik /role therapist atau /role pelacur untuk memulai service.",
+        parse_mode='Markdown'
+    )
+
+
+async def cmd_batal(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Handler untuk command /batal - Batalkan sesi dan kembali ke Nova"""
+    user_id = update.effective_user.id
+    settings = get_settings()
+    
+    if user_id != settings.admin_id:
+        await update.message.reply_text("❌ Maaf, command hanya untuk admin.")
+        return
+    
+    from utils.user_mode import get_active_role, get_user_flow, set_user_mode
+    from handlers.message import _stop_auto_send
+    
+    active_role = await get_active_role(user_id)
+    flow = get_user_flow(user_id)
+    
+    if active_role and flow:
+        # Hentikan auto-send
+        await _stop_auto_send(user_id)
+        
+        # Hentikan flow
+        if hasattr(flow, 'is_active'):
+            flow.is_active = False
+        if hasattr(flow, 'auto_send_active'):
+            flow.auto_send_active = False
+        if hasattr(flow, 'auto_send_running'):
+            flow.auto_send_running = False
+    
+    # Reset ke mode chat
+    await set_user_mode(user_id, 'chat')
+    
+    await update.message.reply_text(
+        "💜 *KEMBALI KE NOVA* 💜\n\n"
+        "Nova di sini, Mas. Ada yang bisa dibantu?",
+        parse_mode='Markdown'
+    )
+
+
+async def cmd_pause(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Handler untuk command /pause - Jeda sesi sementara"""
+    user_id = update.effective_user.id
+    settings = get_settings()
+    
+    if user_id != settings.admin_id:
+        await update.message.reply_text("❌ Maaf, command hanya untuk admin.")
+        return
+    
+    from utils.user_mode import get_active_role, get_user_flow
+    
+    active_role = await get_active_role(user_id)
+    flow = get_user_flow(user_id)
+    
+    if not active_role or not flow:
+        await update.message.reply_text("📭 Tidak ada sesi yang sedang berjalan.")
+        return
+    
+    if not flow.is_active:
+        await update.message.reply_text("📭 Sesi tidak aktif.")
+        return
+    
+    if hasattr(flow, 'is_paused') and flow.is_paused:
+        await update.message.reply_text("⏸️ Sesi sudah dalam keadaan pause.")
+        return
+    
+    # Pause session
+    if hasattr(flow, 'pause'):
+        await flow.pause()
+        await update.message.reply_text(
+            "⏸️ *Sesi di-pause*\n\n"
+            "Ketik /resume untuk melanjutkan sesi.\n"
+            "Ketik /batal untuk mengakhiri sesi.",
+            parse_mode='Markdown'
+        )
+    else:
+        await update.message.reply_text("❌ Fitur pause tidak tersedia untuk role ini.")
+
+
+async def cmd_resume(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Handler untuk command /resume - Lanjutkan sesi yang di-pause"""
+    user_id = update.effective_user.id
+    settings = get_settings()
+    
+    if user_id != settings.admin_id:
+        await update.message.reply_text("❌ Maaf, command hanya untuk admin.")
+        return
+    
+    from utils.user_mode import get_active_role, get_user_flow
+    
+    active_role = await get_active_role(user_id)
+    flow = get_user_flow(user_id)
+    
+    if not active_role or not flow:
+        await update.message.reply_text("📭 Tidak ada sesi yang sedang berjalan.")
+        return
+    
+    if not hasattr(flow, 'is_paused') or not flow.is_paused:
+        await update.message.reply_text("▶️ Tidak ada sesi yang di-pause.")
+        return
+    
+    # Resume session
+    if hasattr(flow, 'resume'):
+        await flow.resume()
+        await update.message.reply_text(
+            "▶️ *Sesi dilanjutkan*\n\n"
+            "Role akan melanjutkan aktivitas.",
+            parse_mode='Markdown'
+        )
+    else:
+        await update.message.reply_text("❌ Fitur resume tidak tersedia untuk role ini.")
 
 
 # =============================================================================
@@ -154,12 +343,17 @@ class NovaServiceBot:
         request = HTTPXRequest(connection_pool_size=50, connect_timeout=60)
         app = ApplicationBuilder().token(settings.telegram_token).request(request).build()
         
-        # Register all commands
-        register_general_commands(app)
-        register_role_commands(app)
-        
-        # ✅ Tambahkan command /status secara langsung
+        # ========== REGISTER ALL COMMANDS ==========
+        # General commands
+        app.add_handler(CommandHandler("start", cmd_start))
+        app.add_handler(CommandHandler("nova", cmd_nova))
+        app.add_handler(CommandHandler("batal", cmd_batal))
+        app.add_handler(CommandHandler("pause", cmd_pause))
+        app.add_handler(CommandHandler("resume", cmd_resume))
         app.add_handler(CommandHandler("status", cmd_status))
+        
+        # Role commands (dari register_role_commands)
+        register_role_commands(app)
         
         # Message handler (must be last)
         app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, message_handler))
@@ -269,10 +463,13 @@ class NovaServiceBot:
         logger.info("=" * 70)
         logger.info("✨ NovaService is ready!")
         logger.info(f"👑 Admin ID: {get_settings().admin_id}")
-        logger.info("   Kirim /nova untuk panggil Nova")
+        logger.info("   Kirim /start untuk melihat semua command")
         logger.info("   Kirim /role therapist untuk panggil therapist")
         logger.info("   Kirim /role pelacur untuk panggil pelacur")
         logger.info("   Kirim /status untuk lihat status")
+        logger.info("   Kirim /pause untuk jeda sesi")
+        logger.info("   Kirim /resume untuk lanjutkan sesi")
+        logger.info("   Kirim /batal untuk kembali ke Nova")
         logger.info("=" * 70)
         
         # Keep running
