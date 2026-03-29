@@ -12,7 +12,7 @@ from telegram import Update
 from telegram.ext import ContextTypes
 
 from config import get_settings
-from utils.user_mode import get_user_mode, get_active_role, get_user_flow
+from utils.user_mode import get_user_mode, get_active_role
 
 logger = logging.getLogger(__name__)
 
@@ -29,12 +29,12 @@ def set_nova_available(status: bool):
     NOVA_AVAILABLE = status
     logger.info(f"[NOVA] Availability set to: {status}")
 
+
 async def message_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Handler untuk pesan biasa"""
     user_id = update.effective_user.id
     settings = get_settings()
     
-    # Hanya admin
     if user_id != settings.admin_id:
         return
     
@@ -44,7 +44,6 @@ async def message_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     
     logger.info(f"📨 Message from {user_id}: {pesan[:50]}")
     
-    # Ambil mode & role
     mode = await get_user_mode(user_id)
     active_role = await get_active_role(user_id)
     
@@ -53,7 +52,6 @@ async def message_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     # ========== ROLE MODE ==========
     if mode == 'role' and active_role:
         try:
-            # ✅ Lazy import (hindari circular import)
             from commands.role import get_user_role, get_user_flow
             
             role = get_user_role(user_id)
@@ -61,23 +59,23 @@ async def message_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
             
             if not role or not flow:
                 await update.message.reply_text(
-                    "💜 Role belum aktif. Silakan pilih role dulu dengan /role therapist atau /role pelacur",
+                    "💜 Role belum aktif. Silakan pilih role dulu dengan **/role therapist** atau **/role pelacur**",
                     parse_mode='Markdown'
                 )
                 return
             
             logger.info(f"Processing message for role: {active_role}, character: {role.name}")
             
-            # Proses pesan ke flow
+            # Proses pesan Mas ke flow
             response = await flow.process(pesan)
             
             if response:
                 await update.message.reply_text(response, parse_mode='Markdown')
             
-            # Stop auto-send lama
+            # Hentikan auto-send task jika ada
             await _stop_auto_send(user_id)
             
-            # Start auto-send baru jika masih aktif
+            # Jika flow masih aktif, mulai auto-send task baru
             if flow.is_active:
                 await _start_auto_send(user_id, flow, context)
             
@@ -89,18 +87,6 @@ async def message_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
             )
         return
     
-    # ========== DEFAULT CHAT MODE ==========
-    await _stop_auto_send(user_id)
-    
-    await update.message.reply_text(
-        "*Nova tersenyum*\n\n"
-        "\"Iya, Mas. Nova dengerin kok.\n\n"
-        "Ketik /role therapist atau /role pelacur kalau mau service.\"",
-        parse_mode='Markdown'
-    )
-
-        return
-    
     # ========== CHAT MODE DEFAULT ==========
     # Hentikan auto-send jika ada
     await _stop_auto_send(user_id)
@@ -109,7 +95,7 @@ async def message_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         "*Nova tersenyum*\n\n\"Iya, Mas. Nova dengerin kok.\n\nKetik /role therapist atau /role pelacur kalo mau service, Mas.\"",
         parse_mode='Markdown'
     )
-    
+
 
 # =============================================================================
 # AUTO-SEND TASK MANAGEMENT
