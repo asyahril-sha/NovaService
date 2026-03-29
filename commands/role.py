@@ -239,6 +239,7 @@ async def status_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     
     mode = await get_user_mode(user_id)
     active_role = await get_active_role(user_id)
+    flow = _user_flows.get(user_id)
     
     if mode != 'role' or not active_role:
         await update.message.reply_text(
