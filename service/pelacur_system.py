@@ -588,15 +588,12 @@ class PelacurSystem(PelacurAuto, PelacurManual):
                 return response
             
             # ========== AUTO SEND ACTIVE ==========
-            # Di method process(), saat auto-send active
             if self.auto_send_active:
-                response = await self._process_auto_phase()
-                if response:
-                    logger.info(f"📤 Auto-send response length: {len(response)} chars")
-                    # ✅ JANGAN KIRIM LANGSUNG! Biarkan handler yang mengirim
-                    # Handler yang memanggil process() akan mengirim response-nya
-                    self.scene_context.append(f"Auto scene: {response[:100]}...")
-                return response
+            response = await self._process_auto_phase()
+            if response:
+                logger.info(f"📤 Auto-send response length: {len(response)} chars")
+                self.scene_context.append(f"Auto scene: {response[:100]}...")
+            return response
             
             # ========== AFTERCARE ACTIVE ==========
             if self.aftercare_active:
