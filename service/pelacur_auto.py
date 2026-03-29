@@ -72,34 +72,35 @@ class PelacurAuto(PelacurCore):
     
     async def _auto_send_loop(self):
         """Loop background untuk auto-send scene"""
-        while self.auto_send_running and self.is_active and not self.auto_send_active:
+        # ✅ PERBAIKAN: ganti not self.auto_send_active menjadi self.auto_send_active
+        while self.auto_send_running and self.is_active and self.auto_send_active:
             try:
                 # Cek jika sedang menunggu respons, jangan kirim scene
                 if self.waiting_for_response:
                     await asyncio.sleep(1)
                     continue
-                
+            
                 # Cek apakah fase auto sudah selesai
                 if self._is_auto_phase_complete():
                     logger.info(f"✅ Auto phase {self.current_phase_name} completed")
                     await self._stop_auto_send_task()
                     await self._on_auto_phase_complete()
                     break
-                
+            
                 # Cek apakah perlu kirim scene berikutnya
                 if self._should_send_next_auto_scene():
                     scene = await self._generate_current_auto_scene()
                     if scene:
                         logger.info(f"📤 Auto-send scene #{self.scene_count}")
-                        # Kirim scene melalui character (asumsi ada method send_message)
+                        # Kirim scene melalui character
                         if hasattr(self.character, 'send_message'):
                             await self.character.send_message(scene)
                         # Simpan ke memory
                         self.memory.record_action(f"auto_scene_{self.current_phase_name}", scene)
                         self.memory.update_from_response(scene, self.current_phase_name)
-                
+            
                 await asyncio.sleep(1)  # Check setiap detik
-                
+            
             except asyncio.CancelledError:
                 break
             except Exception as e:
@@ -173,24 +174,17 @@ class PelacurAuto(PelacurCore):
         """Generate scene BJ auto menggunakan AI"""
         scene_num = self.scene_count
         total_scenes = self.BJ_SCENES
-        
+    
         # Update emotional state
         self._update_emotional_state()
-        
+    
         # Dapatkan konteks memory
         memory_context = self.memory.get_full_context()
-
-        scene = await self._generate_scene(full_prompt)
     
-        # Bersihkan markdown yang tidak lengkap
-        scene = self._clean_markdown(scene)
-    
-        return scene
-        
         # Build prompt menggunakan prompt builder yang sudah ada
         prompt = self.prompt_builder.build_auto_prompt("bj", scene_num, total_scenes)
         
-        # Tambahkan memory context
+        # ✅ PERBAIKAN: definisikan full_prompt
         full_prompt = f"""
 {memory_context}
 
@@ -207,7 +201,13 @@ INSTRUKSI KHUSUS UNTUK SCENE INI:
 RESPON KAMU (narasi BJ, bukan jawaban AI):
 """
         
-        return await self._generate_scene(full_prompt)
+        # Generate scene dengan AI
+        scene = await self._generate_scene(full_prompt)
+    
+        # Bersihkan markdown yang tidak lengkap
+        scene = self._clean_markdown(scene)
+    
+        return scene
     
     # =========================================================================
     # KISSING AUTO PHASE
@@ -248,13 +248,13 @@ RESPON KAMU (narasi BJ, bukan jawaban AI):
         """Generate scene kissing auto menggunakan AI"""
         scene_num = self.scene_count
         total_scenes = self.KISSING_SCENES
-        
+    
         # Update emotional state
         self._update_emotional_state()
-        
+    
         # Dapatkan konteks memory
         memory_context = self.memory.get_full_context()
-        
+    
         # Build prompt menggunakan prompt builder yang sudah ada
         prompt = self.prompt_builder.build_auto_prompt("kissing", scene_num, total_scenes)
         
@@ -274,8 +274,13 @@ INSTRUKSI KHUSUS UNTUK SCENE INI:
 
 RESPON KAMU (narasi kissing + gesekan, bukan jawaban AI):
 """
-        
-        return await self._generate_scene(full_prompt)
+        # Generate scene dengan AI
+        scene = await self._generate_scene(full_prompt)
+    
+        # Bersihkan markdown yang tidak lengkap
+        scene = self._clean_markdown(scene)
+    
+        return scene
     
     # =========================================================================
     # FOREPLAY REQUEST (Transisi ke manual)
