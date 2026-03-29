@@ -109,8 +109,18 @@ async def _start_auto_send(user_id: int, flow, context: ContextTypes.DEFAULT_TYP
         # Hentikan task lama jika ada
         await _stop_auto_send(user_id)
         
-        # Buat task baru
-        task = asyncio.create_task(_auto_send_loop(user_id, flow, context))
+        # ✅ SET CALLBACK UNTUK KIRIM LANGSUNG KE TELEGRAM
+        flow._send_callback = lambda msg: context.bot.send_message(
+            chat_id=user_id,
+            text=msg,
+            parse_mode='Markdown'
+        )
+        
+        # ✅ PASTIKAN FLOW ADALAH PelacurSystem
+        logger.info(f"🔍 Flow class: {flow.__class__.__name__}")
+        
+        # ✅ PANGGIL _auto_send_loop DARI FLOW, BUKAN BUAT BARU
+        task = asyncio.create_task(flow._auto_send_loop())
         _auto_send_tasks[user_id] = task
         logger.info(f"🔄 Auto-send started for user {user_id}")
     except Exception as e:
