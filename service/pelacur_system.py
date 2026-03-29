@@ -593,7 +593,7 @@ class PelacurSystem(PelacurAuto, PelacurManual):
                 response = await self._process_auto_phase()
                 if response:
                     logger.info(f"📤 Auto-send response length: {len(response)} chars")
-                     # ✅ JANGAN KIRIM LANGSUNG! Biarkan handler yang mengirim
+                    # ✅ JANGAN KIRIM LANGSUNG! Biarkan handler yang mengirim
                     # Handler yang memanggil process() akan mengirim response-nya
                     self.scene_context.append(f"Auto scene: {response[:100]}...")
                 return response
