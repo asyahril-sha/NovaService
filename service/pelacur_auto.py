@@ -69,7 +69,14 @@ class PelacurAuto(PelacurCore):
                         # ✅ PERUBAHAN: Hanya 1 baris ini yang diubah!
                         # Sebelum: if hasattr(self.character, 'send_message'): await self.character.send_message(scene)
                         # Sesudah:
-                        self._pending_scene = scene
+                        if self._send_callback:
+                            try:
+                                await self._send_callback(scene)
+                                logger.info(f"✅ Scene #{self.scene_count} sent")
+                            except Exception as e:
+                                logger.error(f"❌ Send callback failed: {e}")
+                        else:
+                            logger.error("❌ No send callback available!")
                         
                         # Simpan ke memory
                         self.memory.record_action(f"auto_scene_{self.current_phase_name}", scene)
