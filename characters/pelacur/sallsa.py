@@ -1,4 +1,4 @@
-# characters/pelacur/alyssa.py
+# characters/pelacur/sallsa.py
 """
 Sallsa Bintan - Pelacur
 Usia: 24 tahun
@@ -10,7 +10,7 @@ from characters.base_character import BaseCharacter
 
 class SallsaCharacter(BaseCharacter):
     """
-    Alyssa Daguise - Pelacur
+    Sallsa Bintan - Pelacur
     Body: 170cm, 53kg, kulit putih, tubuh model
     Face: Wajah bule oriental, mata biru, hidung mancung, bibir penuh
     Suara: Berat, tegas, napas dalam, suara rendah sensual
