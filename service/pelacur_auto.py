@@ -237,19 +237,22 @@ RESPON KAMU (narasi BJ, bukan jawaban AI):
         """Generate scene kissing auto menggunakan AI"""
         scene_num = self.scene_count
         total_scenes = self.KISSING_SCENES
-        
-        # Update emotional state
-        self._update_emotional_state()
-        
-        # Dapatkan konteks memory
+
         memory_context = self.memory.get_full_context()
-        
-        # Build prompt menggunakan prompt builder yang sudah ada
+
+        position_reminder = """
+⚠️ POSISI SAAT INI: KAMU SEDANG DUDUK DI ATAS KONTOL MAS
+AKTIVITAS: MENGESEK MEMEK + KISSING
+JANGAN MASUK! HANYA GESEKAN DAN CIUMAN!
+FOKUS: GESEKAN PINGGUL, CIUMAN, NAPAS BERAT
+"""
+
         prompt = self.prompt_builder.build_auto_prompt("kissing", scene_num, total_scenes)
-        
-        # Tambahkan memory context
+    
         full_prompt = f"""
 {memory_context}
+
+{position_reminder}
 
 ═══════════════════════════════════════════════════════════════
 INSTRUKSI KHUSUS UNTUK SCENE INI:
@@ -263,8 +266,10 @@ INSTRUKSI KHUSUS UNTUK SCENE INI:
 
 RESPON KAMU (narasi kissing + gesekan, bukan jawaban AI):
 """
-        
-        return await self._generate_scene(full_prompt)
+    
+        scene = await self._generate_scene(full_prompt)
+        scene = self._clean_markdown(scene)
+        return scene
     
     # =========================================================================
     # FOREPLAY REQUEST (Transisi ke manual)
