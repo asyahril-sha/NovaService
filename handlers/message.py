@@ -12,7 +12,8 @@ from telegram import Update
 from telegram.ext import ContextTypes
 
 from config import get_settings
-from utils.user_mode import get_user_mode, get_active_role
+from utils.user_mode import get_user_mode, get_active_role, get_user_flow
+from commands.role import get_user_role
 
 logger = logging.getLogger(__name__)
 
