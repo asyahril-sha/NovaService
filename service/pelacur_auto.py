@@ -60,7 +60,8 @@ class PelacurAuto(PelacurCore):
             logger.error("❌ CRITICAL: _auto_send_loop method not found in PelacurAuto!")
             logger.error(f"   Available methods: {[m for m in dir(self) if not m.startswith('_')]}")
             return
-        
+
+        logger.info("✅ _auto_send_loop method found, starting task...")
         self.auto_send_running = True
         self.auto_send_task = asyncio.create_task(self._auto_send_loop())
         logger.info(f"🚀 Auto-send task started for {self.current_phase_name}")
