@@ -370,16 +370,51 @@ async def resume_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         )
     else:
         await update.message.reply_text("❌ Fitur resume tidak tersedia untuk role ini.")
+        
 
-
+async def cmd_status(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Handler untuk command /status - Lihat status sesi role yang aktif"""
+    user_id = update.effective_user.id
+    settings = get_settings()
+    
+    if user_id != settings.admin_id:
+        await update.message.reply_text("❌ Maaf, command hanya untuk admin.")
+        return
+    
+    from utils.user_mode import get_user_mode, get_active_role, get_user_flow
+    
+    mode = await get_user_mode(user_id)
+    active_role = await get_active_role(user_id)
+    flow = get_user_flow(user_id)
+    
+    if mode != 'role' or not active_role or not flow:
+        await update.message.reply_text(
+            "📭 *Tidak ada sesi role yang aktif*\n\n"
+            "Gunakan /role therapist atau /role pelacur untuk memulai, Mas.\n\n"
+            "💜 *Nova tersenyum*\n\n\"Ada yang bisa Nova bantu?\"",
+            parse_mode='Markdown'
+        )
+        return
+    
+    # Cek apakah flow punya method get_status
+    if hasattr(flow, 'get_status'):
+        status_text = flow.get_status()
+    else:
+        status_text = f"✅ *Sesi {active_role} sedang aktif*\n\n"
+        if hasattr(flow, 'character'):
+            status_text += f"👤 Karakter: {flow.character.name}\n"
+        status_text += f"\nKetik /batal untuk mengakhiri sesi."
+    
+    await update.message.reply_text(status_text, parse_mode='Markdown')
+    
 # =============================================================================
 # REGISTER FUNCTION
 # =============================================================================
 
 def register_role_commands(app):
     """Register semua role commands"""
-    app.add_handler(CommandHandler("role", role_command))
-    app.add_handler(CommandHandler("status", status_command))
+     app.add_handler(CommandHandler("role", role_command))
+    app.add_handler(CommandHandler("status", cmd_status))  # ← TAMBAHKAN INI
     app.add_handler(CommandHandler("statusrole", statusrole_command))
     app.add_handler(CommandHandler("batal", batal_command))
     app.add_handler(CommandHandler("pause", pause_command))
