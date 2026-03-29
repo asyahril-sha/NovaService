@@ -55,7 +55,7 @@ async def message_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
             from commands.role import get_user_role, get_user_flow
             
             role = get_user_role(user_id)
-            flow = await get_user_flow(user_id)
+            flow = get_user_flow(user_id)
             
             if not role or not flow:
                 await update.message.reply_text(
