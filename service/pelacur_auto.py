@@ -7,6 +7,7 @@ Auto send scene setiap 30 detik
 import asyncio
 import time
 import logging
+import re
 from typing import Optional
 
 from service.pelacur_core import PelacurCore
@@ -20,6 +21,30 @@ class PelacurAuto(PelacurCore):
     - BJ: 30 menit, auto scene setiap 30 detik
     - Kissing: 30 menit, auto scene setiap 30 detik
     """
+
+    def _clean_markdown(self, text: str) -> str:
+        """Bersihkan markdown yang tidak lengkap sebelum dikirim ke Telegram"""
+        import re
+        
+        # Hitung jumlah * dan _
+        asterisk_count = text.count('*')
+        underscore_count = text.count('_')
+    
+        # Jika jumlah * ganjil, hapus * terakhir yang tidak berpasangan
+        if asterisk_count % 2 != 0:
+            # Hapus * terakhir yang tidak berpasangan
+            text = re.sub(r'\*([^*]*)$', r'\1', text)
+    
+        # Jika jumlah _ ganjil, hapus _ terakhir yang tidak berpasangan
+        if underscore_count % 2 != 0:
+            text = re.sub(r'_([^_]*)$', r'\1', text)
+    
+        # Escape karakter khusus yang bisa menyebabkan error
+        special_chars = ['[', ']', '(', ')', '\\', '`']
+        for char in special_chars:
+            text = text.replace(char, f'\\{char}')
+    
+        return text
     
     # =========================================================================
     # AUTO SEND TASK MANAGEMENT
@@ -154,6 +179,13 @@ class PelacurAuto(PelacurCore):
         
         # Dapatkan konteks memory
         memory_context = self.memory.get_full_context()
+
+        scene = await self._generate_scene(full_prompt)
+    
+        # Bersihkan markdown yang tidak lengkap
+        scene = self._clean_markdown(scene)
+    
+        return scene
         
         # Build prompt menggunakan prompt builder yang sudah ada
         prompt = self.prompt_builder.build_auto_prompt("bj", scene_num, total_scenes)
