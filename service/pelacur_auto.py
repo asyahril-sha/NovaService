@@ -90,33 +90,8 @@ class PelacurAuto(PelacurCore):
                         logger.info(f"📤 Preparing to send scene #{self.scene_count}")
                         logger.info(f"   Scene length: {len(scene)} characters")
                         logger.info(f"   Scene preview: {scene[:200]}...")
-                    
-                        # ✅ CEK PANJANG PESAN
-                        max_length = 3000  # Telegram max 4096, kasih buffer
-                        if len(scene) > max_length:
-                            logger.warning(f"⚠️ Scene too long ({len(scene)} chars), truncating")
-                        scene = scene[:max_length]
-                    
-                        # ✅ KIRIM DENGAN ERROR HANDLING DETAIL
-                        try:
-                            # Coba kirim dengan parse_mode None (plain text)
-                            if hasattr(self.character, 'send_message'):
-                                logger.info(f"📤 Sending to Telegram...")
-                                await self.character.send_message(scene, parse_mode=None)
-                                logger.info(f"✅ Scene #{self.scene_count} sent successfully")
-                            else:
-                                logger.error("❌ No send_message method available")
-                        except Exception as send_error:
-                            logger.error(f"❌ Send failed: {send_error}")
-                            logger.error(f"   Error type: {type(send_error).__name__}")
                         
-                            # Coba kirim versi yang lebih pendek
-                            try:
-                                short_scene = scene[:2000]
-                                await self.character.send_message(short_scene, parse_mode=None)
-                                logger.info(f"✅ Short version sent (2000 chars)")
-                            except Exception as retry_error:
-                                logger.error(f"❌ Retry also failed: {retry_error}")
+                        self._pending_scene = scene
                     
                         # Simpan ke memory
                         self.memory.record_action(f"auto_scene_{self.current_phase_name}", scene)
@@ -128,7 +103,8 @@ class PelacurAuto(PelacurCore):
                 break
             except Exception as e:
                 logger.error(f"Auto-send loop error: {e}")
-                await asyncio.sleep(5)
+                await asyncio.sleep(5)                 
+
     
     async def _generate_current_auto_scene(self) -> str:
         """Generate scene untuk auto phase saat ini"""
