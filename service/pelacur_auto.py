@@ -7,6 +7,7 @@ Auto send scene setiap 30 detik
 import asyncio
 import time
 import logging
+import re
 from typing import Optional
 
 from service.pelacur_core import PelacurCore
@@ -20,6 +21,24 @@ class PelacurAuto(PelacurCore):
     - BJ: 30 menit, auto scene setiap 30 detik
     - Kissing: 30 menit, auto scene setiap 30 detik
     """
+    def _clean_markdown(self, text: str) -> str:
+        """Bersihkan markdown yang tidak lengkap sebelum dikirim ke Telegram"""
+        import re
+        
+        asterisk_count = text.count('*')
+        underscore_count = text.count('_')
+    
+        if asterisk_count % 2 != 0:
+            text = re.sub(r'\*([^*]*)$', r'\1', text)
+    
+        if underscore_count % 2 != 0:
+            text = re.sub(r'_([^_]*)$', r'\1', text)
+    
+        special_chars = ['[', ']', '(', ')', '\\', '`']
+        for char in special_chars:
+            text = text.replace(char, f'\\{char}')
+    
+        return text
     
     # =========================================================================
     # AUTO SEND TASK MANAGEMENT
