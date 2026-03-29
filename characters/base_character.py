@@ -122,7 +122,7 @@ class BaseCharacter:
             "Hana": "hitam",
             "Shindy": "ungu",
             "Nadya": "pink",
-            "Alyssa": "merah"
+            "Sallsa": "merah"
         }
         return colors.get(self.name, "hitam")
     
@@ -195,7 +195,7 @@ class BaseCharacter:
             "Hana": "*Hana menghentikan gerakan, menatap Mas*\n\n\"Aku mau climax. Mas cepetin?\"",
             "Shindy": "*Shindy mendekat ke telinga Mas, napasnya panas*\n\n\"Mas... aku mau climax... bentar lagi...\"",
             "Nadya": "*Nadya memeluk Mas erat, tubuhnya gemetar kecil*\n\n\"Mas... aku... udah mau...\"",
-            "Alyssa": "*Alyssa menahan napas, tubuhnya tegang*\n\n\"Aku climax! Sekarang!\""
+            "Sallsa": "*Sallsa menahan napas, tubuhnya tegang*\n\n\"Aku climax! Sekarang!\""
         }
         return warnings.get(self.name, "*napas mulai berat, tubuh gemetar*\n\n\"Aku mau climax...\"")
     
@@ -369,7 +369,7 @@ class BaseCharacter:
             "Hana": f"*Hana menghela napas panjang*\n\n\"Ahh... puas. Mas gimana?\"",
             "Shindy": f"*Shindy memeluk Mas, napasnya panas di telinga*\n\n\"Ahh... Mas... makasih...\"",
             "Nadya": f"*Nadya memeluk Mas, tubuhnya gemetar kecil*\n\n\"Mas... aku... climax... lemes...\"",
-            "Alyssa": f"*Alyssa mendesah brutal, tubuh tegang lalu lemas*\n\n\"Ahh! climax! puas!\""
+            "Sallsa": f"*Sallsa mendesah brutal, tubuh tegang lalu lemas*\n\n\"Ahh! climax! puas!\""
         }
         return climax_responses.get(self.name, f"*{self.name} gemetar, napas putus-putus*\n\n\"Ahh... climax...\"")
     
