@@ -139,8 +139,11 @@ class PelacurAuto(PelacurCore):
             self.waiting_start_time = time.time()
             
             foreplay_msg = await self._build_foreplay_request()
-            if hasattr(self.character, 'send_message'):
-                await self.character.send_message(foreplay_msg)
+            # ✅ Kirim via callback (bukan await string)
+            if self._send_callback:
+                await self._send_callback(foreplay_msg)
+            else:
+                logger.error("❌ No send callback available for foreplay request")
     
     # =========================================================================
     # BJ AUTO PHASE
