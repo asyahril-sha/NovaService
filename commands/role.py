@@ -10,7 +10,7 @@ from telegram import Update
 from telegram.ext import ContextTypes, CommandHandler
 
 from config import get_settings
-from utils.user_mode import set_user_mode, get_user_mode, get_active_role, set_active_role, set_user_flow
+from utils.user_mode import set_user_mode, get_user_mode, get_active_role, set_active_role, set_user_flow, get_user_flow
 from service.therapist_flow import TherapistFlow
 from service.pelacur_system import PelacurSystem
 from handlers.message import _stop_auto_send
