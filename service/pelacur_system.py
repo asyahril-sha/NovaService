@@ -589,11 +589,11 @@ class PelacurSystem(PelacurAuto, PelacurManual):
             
             # ========== AUTO SEND ACTIVE ==========
             if self.auto_send_active:
-            response = await self._process_auto_phase()
-            if response:
-                logger.info(f"📤 Auto-send response length: {len(response)} chars")
-                self.scene_context.append(f"Auto scene: {response[:100]}...")
-            return response
+                response = await self._process_auto_phase()
+                if response:
+                    logger.info(f"📤 Auto-send response length: {len(response)} chars")
+                    self.scene_context.append(f"Auto scene: {response[:100]}...")
+                return response
             
             # ========== AFTERCARE ACTIVE ==========
             if self.aftercare_active:
