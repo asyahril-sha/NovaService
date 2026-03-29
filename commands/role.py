@@ -413,7 +413,7 @@ async def cmd_status(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 def register_role_commands(app):
     """Register semua role commands"""
-     app.add_handler(CommandHandler("role", role_command))
+    app.add_handler(CommandHandler("role", role_command))
     app.add_handler(CommandHandler("status", cmd_status))  # ← TAMBAHKAN INI
     app.add_handler(CommandHandler("statusrole", statusrole_command))
     app.add_handler(CommandHandler("batal", batal_command))
