@@ -104,25 +104,37 @@ async def message_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
 async def _start_auto_send(user_id: int, flow, context: ContextTypes.DEFAULT_TYPE):
     """Mulai auto-send task untuk mengirim scene otomatis"""
     global _auto_send_tasks
-    
+
     try:
         # Hentikan task lama jika ada
         await _stop_auto_send(user_id)
-        
-        # ✅ SET CALLBACK UNTUK KIRIM LANGSUNG KE TELEGRAM
-        flow._send_callback = lambda msg: context.bot.send_message(
-            chat_id=user_id,
-            text=msg,
-            parse_mode='Markdown'
-        )
-        
-        # ✅ PASTIKAN FLOW ADALAH PelacurSystem
+
+        # ✅ Gunakan async function (bukan lambda)
+        async def send_callback(msg):
+            """Kirim pesan langsung ke Telegram"""
+            try:
+                await context.bot.send_message(
+                    chat_id=user_id,
+                    text=msg,
+                    parse_mode='Markdown'
+                )
+                logger.debug(f"✅ Auto-send message delivered to {user_id}")
+            except Exception as e:
+                logger.error(f"❌ Failed to send auto message: {e}")
+
+        # ✅ Set callback ke flow
+        flow._send_callback = send_callback
         logger.info(f"🔍 Flow class: {flow.__class__.__name__}")
-        
-        # ✅ PANGGIL _auto_send_loop DARI FLOW, BUKAN BUAT BARU
-        task = asyncio.create_task(flow._auto_send_loop())
-        _auto_send_tasks[user_id] = task
+        logger.info(f"✅ Send callback registered for user {user_id}")
+
+        # ✅ Start auto-send task dari flow
+        await flow._start_auto_send_task()
+
+        # ✅ SIMPAN TASK (INI YANG KAMU KURANG)
+        _auto_send_tasks[user_id] = flow.auto_send_task
+
         logger.info(f"🔄 Auto-send started for user {user_id}")
+
     except Exception as e:
         logger.error(f"Error starting auto-send for user {user_id}: {e}")
 
