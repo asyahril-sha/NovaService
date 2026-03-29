@@ -161,6 +161,23 @@ class PelacurAuto(PelacurCore):
         """Generate scene BJ auto menggunakan AI"""
         scene_num = self.scene_count
         total_scenes = self.BJ_SCENES
+
+        # ✅ TAMBAHKAN PENGINGAT POSISI
+        position_reminder = """
+⚠️ POSISI SAAT INI: KAMU SEDANG BERLUTUT DI DEPAN MAS
+AKTIVITAS: MENGHISAP KONTOL MAS (BLOWJOB)
+JANGAN BERUBAH POSISI! JANGAN DUDUK DI ATAS!
+FOKUS: GERAKAN MULUT, LIDAH, HISAPAN
+"""
+    
+    full_prompt = f"""
+{memory_context}
+
+{position_reminder}
+
+- Ini adalah scene ke-{scene_num} dari {total_scenes} scene BJ
+...
+"""
         
         # Update emotional state
         self._update_emotional_state()
