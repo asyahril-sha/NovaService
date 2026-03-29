@@ -10,9 +10,10 @@ from telegram import Update
 from telegram.ext import ContextTypes, CommandHandler
 
 from config import get_settings
-from utils.user_mode import set_user_mode, get_user_mode, get_active_role, set_active_role, set_user_flow, get_user_flow
+from utils.user_mode import set_user_mode, get_user_mode, get_active_role, set_active_role, set_user_flow
 from service.therapist_flow import TherapistFlow
 from service.pelacur_system import PelacurSystem
+from handlers.message import _stop_auto_send
 
 logger = logging.getLogger(__name__)
 
@@ -87,7 +88,6 @@ async def _clear_user_role(user_id: int):
     
     # Hentikan auto-send jika ada
     try:
-        from handlers.message import _stop_auto_send  # ← IMPORT DI SINI
         await _stop_auto_send(user_id)
     except ImportError:
         pass
@@ -239,7 +239,6 @@ async def status_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     
     mode = await get_user_mode(user_id)
     active_role = await get_active_role(user_id)
-    flow = _user_flows.get(user_id)
     
     if mode != 'role' or not active_role:
         await update.message.reply_text(
@@ -305,7 +304,6 @@ async def pause_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     
     mode = await get_user_mode(user_id)
     active_role = await get_active_role(user_id)
-    flow = await get_user_flow(user_id)
     
     if mode != 'role' or not active_role:
         await update.message.reply_text("📭 Tidak ada sesi yang sedang berjalan.")
@@ -348,7 +346,6 @@ async def resume_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     
     mode = await get_user_mode(user_id)
     active_role = await get_active_role(user_id)
-    flow = await get_user_flow(user_id)
     
     if mode != 'role' or not active_role:
         await update.message.reply_text("📭 Tidak ada sesi yang sedang berjalan.")
@@ -388,7 +385,7 @@ async def cmd_status(update: Update, context: ContextTypes.DEFAULT_TYPE):
     
     mode = await get_user_mode(user_id)
     active_role = await get_active_role(user_id)
-    flow = get_user_flow(user_id)
+    flow = await get_user_flow(user_id)
     
     if mode != 'role' or not active_role or not flow:
         await update.message.reply_text(
