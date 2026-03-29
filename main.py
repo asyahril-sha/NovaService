@@ -71,7 +71,7 @@ async def cmd_start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     # Cek apakah ada sesi aktif
     from utils.user_mode import get_active_role, get_user_flow
     active_role = await get_active_role(user_id)
-    flow = get_user_flow(user_id)
+    flow = await get_user_flow(user_id)
     
     if active_role and flow and flow.is_active:
         await update.message.reply_text(
@@ -112,7 +112,7 @@ async def cmd_nova(update: Update, context: ContextTypes.DEFAULT_TYPE):
     # Cek apakah ada sesi aktif
     from utils.user_mode import get_active_role, get_user_flow
     active_role = await get_active_role(user_id)
-    flow = get_user_flow(user_id)
+    flow = await get_user_flow(user_id)
     
     if active_role and flow and flow.is_active:
         await update.message.reply_text(
@@ -147,7 +147,7 @@ async def cmd_batal(update: Update, context: ContextTypes.DEFAULT_TYPE):
     from handlers.message import _stop_auto_send
     
     active_role = await get_active_role(user_id)
-    flow = get_user_flow(user_id)
+    flow = await get_user_flow(user_id)
     
     if active_role and flow:
         # Hentikan auto-send
@@ -183,7 +183,7 @@ async def cmd_pause(update: Update, context: ContextTypes.DEFAULT_TYPE):
     from utils.user_mode import get_active_role, get_user_flow
     
     active_role = await get_active_role(user_id)
-    flow = get_user_flow(user_id)
+    flow = await get_user_flow(user_id)
     
     if not active_role or not flow:
         await update.message.reply_text("📭 Tidak ada sesi yang sedang berjalan.")
