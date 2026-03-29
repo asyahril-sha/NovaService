@@ -98,7 +98,6 @@ async def message_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         "Ketik /role therapist atau /role pelacur kalau mau service.\"",
         parse_mode='Markdown'
     )
-```
 
         return
     
