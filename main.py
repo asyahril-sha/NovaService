@@ -20,13 +20,15 @@ from telegram.ext import (
     ApplicationBuilder,
     MessageHandler,
     filters,
-    ContextTypes
+    ContextTypes,
+    CommandHandler  # ✅ Tambahkan ini
 )
 from telegram.request import HTTPXRequest
 
 from config import get_settings
 from commands import register_general_commands, register_role_commands
 from handlers.message import message_handler, set_nova_available
+from commands.role import cmd_status  # ✅ Tambahkan ini
 
 __version__ = "1.0.0"
 
@@ -155,6 +157,9 @@ class NovaServiceBot:
         # Register all commands
         register_general_commands(app)
         register_role_commands(app)
+        
+        # ✅ Tambahkan command /status secara langsung
+        app.add_handler(CommandHandler("status", cmd_status))
         
         # Message handler (must be last)
         app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, message_handler))
