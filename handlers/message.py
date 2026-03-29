@@ -182,8 +182,8 @@ async def _stop_auto_send(user_id: int):
                 logger.error(f"Auto-send loop error: {e}")
                 await asyncio.sleep(5)
                 logger.error(f"Auto-send error for user {user_id}: {e}", exc_info=True)
-    finally:
-        # Cleanup - HAPUS DENGAN AMAN
-        if user_id in _auto_send_tasks:
-            _auto_send_tasks.pop(user_id, None)
-            logger.info(f"🧹 Cleaned up auto-send task for user {user_id}")
+            finally:
+                # Cleanup - HAPUS DENGAN AMAN
+                if user_id in _auto_send_tasks:
+                    _auto_send_tasks.pop(user_id, None)
+                    logger.info(f"🧹 Cleaned up auto-send task for user {user_id}")
