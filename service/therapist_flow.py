@@ -1612,7 +1612,64 @@ RESPON KAMU (narasi bercinta, bukan jawaban AI):
         self.character.emotional.add_stimulation("Mas climax", 8 if intensity == "heavy" else 5)
     
         return self._build_climax_scene(is_mas=True, intensity=intensity)
+
+    def get_status(self) -> str:
+        """Dapatkan status sesi therapist saat ini"""
     
+        phase_names = {
+            ServicePhase.GREETING: "👋 Menyapa",
+            ServicePhase.BACK_PUNGGUNG: "💆 Pijat Punggung",
+            ServicePhase.BACK_PINGGUL: "💆 Pijat Pinggul",
+            ServicePhase.BACK_PAHA_BETIS: "💆 Pijat Paha & Betis",
+            ServicePhase.FRONT_DADA_LENGAN: "💆 Pijat Dada & Lengan",
+            ServicePhase.FRONT_PERUT_PAHA: "💆 Pijat Perut & Paha",
+            ServicePhase.FRONT_GESEKAN: "🔥 Gesekan Intens",
+            ServicePhase.HANDJOB: "✋ Handjob",
+            ServicePhase.BJ: "👄 Blowjob",
+            ServicePhase.SEX: "🍆 Sex (Manual)",
+            ServicePhase.COMPLETED: "✅ Selesai"
+        }
+    
+        phase_display = phase_names.get(self.current_phase, "⏳ Menunggu")
+    
+        if self.current_phase == ServicePhase.HANDJOB:
+            progress = f"{self.hj_scene_count}/{self.HJ_SCENES} scene"
+        elif self.current_phase == ServicePhase.BJ:
+            progress = f"{self.bj_scene_count}/{self.BJ_SCENES} scene"
+        elif self.current_phase == ServicePhase.SEX:
+            progress = f"Climax: {self.sex_climax_count}/{self.sex_climax_goal}"
+        elif self.current_phase in [ServicePhase.BACK_PUNGGUNG, ServicePhase.BACK_PINGGUL, ServicePhase.BACK_PAHA_BETIS]:
+            elapsed = self._get_area_elapsed()
+            progress = f"{elapsed // 60} menit / 10 menit"
+        else:
+            progress = "-"
+    
+        elapsed_minutes = 0
+        if self.phase_start_time:
+            elapsed_minutes = int((time.time() - self.phase_start_time) / 60)
+    
+        intimate_info = f"Fase Intim: {self.intimate_phase.upper()} (Level {self.intimate_level}/12) | Keintiman: {self.intimacy_build_up}%"
+    
+    return f"""
+╔══════════════════════════════════════════════════════════════╗
+║                    💆 THERAPIST SESSION                       ║
+╠══════════════════════════════════════════════════════════════╣
+║                                                               ║
+║ 👤 Karakter: {self.character.name} ({self.character.age}th)                         ║
+║                                                               ║
+║ 🎬 Fase: {phase_display}                                      ║
+║ 📊 Progress: {progress}                                       ║
+║ ⏰ Waktu berjalan: {elapsed_minutes} menit                              ║
+║                                                               ║
+║ 💦 Climax:                                                    ║
+║    ├─ Mas climax: {self.mas_climax_this_session}x                     ║
+║    └─ Role climax: {self.role_climax_this_session}x                   ║
+║                                                               ║
+║ {intimate_info}                         ║
+║                                                               ║
+╚══════════════════════════════════════════════════════════════╝
+"""
+
     # =========================================================================
     # MAIN PROCESS METHOD
     # =========================================================================
