@@ -1,7 +1,7 @@
 # commands/role.py
 """
 Role Commands NovaService
-/role therapist, /role pelacur, /statusrole, /batal
+/role therapist, /role pelacur, /status, /statusrole, /batal, /pause, /resume
 """
 
 import logging
@@ -10,9 +10,10 @@ from telegram import Update
 from telegram.ext import ContextTypes, CommandHandler
 
 from config import get_settings
-from utils.user_mode import set_user_mode, get_user_mode, get_active_role
+from utils.user_mode import set_user_mode, get_user_mode, get_active_role, set_active_role, set_user_flow
 from service.therapist_flow import TherapistFlow
-from service.pelacur_flow import PelacurFlow
+from service.pelacur_system import PelacurSystem
+from handlers.message import _stop_auto_send
 
 logger = logging.getLogger(__name__)
 
@@ -36,6 +37,10 @@ def get_user_flow(user_id: int):
     return _user_flows.get(user_id)
 
 
+# =============================================================================
+# MAIN ROLE COMMAND
+# =============================================================================
+
 async def role_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Handler /role [therapist/pelacur]"""
     user_id = update.effective_user.id
@@ -47,9 +52,10 @@ async def role_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     args = context.args
     if not args:
         await update.message.reply_text(
+            "🎭 *Pilih Role*\n\n"
             "Gunakan: `/role therapist` atau `/role pelacur`\n\n"
-            "Therapist: Anya, Syifa, Laura, Tara, Pevita, Maudy, Zara, Angela\n"
-            "Pelacur: Davina, Michelle, Jihane, Tissa, Hana, Shindy, Nadya, Alyssa",
+            "*Therapist:* Anya, Syifa, Laura, Tara, Pevita, Maudy, Zara, Angela\n"
+            "*Pelacur:* Davina, Michelle, Jihane, Tissa, Hana, Shindy, Nadya, Alyssa",
             parse_mode='Markdown'
         )
         return
@@ -72,13 +78,16 @@ async def role_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         )
 
 
+# =============================================================================
+# CLEAR ROLE
+# =============================================================================
+
 async def _clear_user_role(user_id: int):
     """Bersihkan role lama user"""
     global _user_roles, _user_flows
     
     # Hentikan auto-send jika ada
     try:
-        from handlers.message import _stop_auto_send
         await _stop_auto_send(user_id)
     except ImportError:
         pass
@@ -93,6 +102,10 @@ async def _clear_user_role(user_id: int):
     
     logger.info(f"🧹 Cleared role for user {user_id}")
 
+
+# =============================================================================
+# ACTIVATE THERAPIST
+# =============================================================================
 
 async def _activate_therapist(user_id: int, character_key: str, update: Update):
     """Aktifkan therapist character"""
@@ -134,6 +147,8 @@ async def _activate_therapist(user_id: int, character_key: str, update: Update):
         _user_roles[user_id] = character
         _user_flows[user_id] = TherapistFlow(character)
         await set_user_mode(user_id, 'role', 'therapist')
+        await set_active_role(user_id, 'therapist')
+        await set_user_flow(user_id, _user_flows[user_id])
         
         # Start session via flow
         greeting = await _user_flows[user_id].start()
@@ -145,6 +160,10 @@ async def _activate_therapist(user_id: int, character_key: str, update: Update):
         logger.error(f"Activate therapist error: {e}", exc_info=True)
         await update.message.reply_text(f"❌ Error: {str(e)}")
 
+
+# =============================================================================
+# ACTIVATE PELACUR
+# =============================================================================
 
 async def _activate_pelacur(user_id: int, character_key: str, update: Update):
     """Aktifkan pelacur character"""
@@ -185,8 +204,10 @@ async def _activate_pelacur(user_id: int, character_key: str, update: Update):
         
         # Simpan karakter dan flow
         _user_roles[user_id] = character
-        _user_flows[user_id] = PelacurFlow(character)
+        _user_flows[user_id] = PelacurSystem(character)
         await set_user_mode(user_id, 'role', 'pelacur')
+        await set_active_role(user_id, 'pelacur')
+        await set_user_flow(user_id, _user_flows[user_id])
         
         # Start session via flow
         greeting = await _user_flows[user_id].start(
@@ -203,12 +224,17 @@ async def _activate_pelacur(user_id: int, character_key: str, update: Update):
         await update.message.reply_text(f"❌ Error: {str(e)}")
 
 
-async def statusrole_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Handler /statusrole - Lihat status role yang aktif"""
+# =============================================================================
+# STATUS COMMAND
+# =============================================================================
+
+async def status_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Handler /status - Lihat status sesi role yang aktif"""
     user_id = update.effective_user.id
     settings = get_settings()
     
     if user_id != settings.admin_id:
+        await update.message.reply_text("❌ Maaf, command hanya untuk admin.")
         return
     
     mode = await get_user_mode(user_id)
@@ -216,22 +242,34 @@ async def statusrole_command(update: Update, context: ContextTypes.DEFAULT_TYPE)
     
     if mode != 'role' or not active_role:
         await update.message.reply_text(
-            "💜 Tidak ada role yang aktif.\n\n"
-            "Gunakan `/role therapist` atau `/role pelacur` untuk mulai, Mas.",
+            "📭 *Tidak ada sesi role yang aktif*\n\n"
+            "Gunakan /role therapist atau /role pelacur untuk memulai, Mas.\n\n"
+            "💜 *Nova tersenyum*\n\n\"Ada yang bisa Nova bantu?\"",
             parse_mode='Markdown'
         )
         return
     
-    role = _user_roles.get(user_id)
-    if role:
-        status_text = role.get_status()
+    flow = _user_flows.get(user_id)
+    if flow and hasattr(flow, 'get_status'):
+        status_text = flow.get_status()
         await update.message.reply_text(status_text, parse_mode='Markdown')
     else:
         await update.message.reply_text(
-            "Role tidak ditemukan. Silakan pilih role lagi, Mas.",
+            f"✅ *Sesi {active_role} sedang aktif*\n\n"
+            f"👤 Karakter: {_user_roles.get(user_id).name if _user_roles.get(user_id) else 'Unknown'}\n"
+            f"\nKetik /batal untuk mengakhiri sesi.",
             parse_mode='Markdown'
         )
 
+
+async def statusrole_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Handler /statusrole - Lihat status role yang aktif (alias)"""
+    await status_command(update, context)
+
+
+# =============================================================================
+# BATAL COMMAND
+# =============================================================================
 
 async def batal_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Handler /batal - Kembali ke mode chat dan bersihkan role"""
@@ -251,9 +289,99 @@ async def batal_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     )
 
 
+# =============================================================================
+# PAUSE AND RESUME COMMANDS
+# =============================================================================
+
+async def pause_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Handler /pause - Jeda sesi sementara"""
+    user_id = update.effective_user.id
+    settings = get_settings()
+    
+    if user_id != settings.admin_id:
+        await update.message.reply_text("❌ Maaf, command hanya untuk admin.")
+        return
+    
+    mode = await get_user_mode(user_id)
+    active_role = await get_active_role(user_id)
+    
+    if mode != 'role' or not active_role:
+        await update.message.reply_text("📭 Tidak ada sesi yang sedang berjalan.")
+        return
+    
+    flow = _user_flows.get(user_id)
+    if not flow:
+        await update.message.reply_text("📭 Sesi tidak ditemukan.")
+        return
+    
+    if not flow.is_active:
+        await update.message.reply_text("📭 Sesi tidak aktif.")
+        return
+    
+    if hasattr(flow, 'is_paused') and flow.is_paused:
+        await update.message.reply_text("⏸️ Sesi sudah dalam keadaan pause.")
+        return
+    
+    # Pause session
+    if hasattr(flow, 'pause'):
+        await flow.pause()
+        await update.message.reply_text(
+            "⏸️ *Sesi di-pause*\n\n"
+            "Ketik /resume untuk melanjutkan sesi.\n"
+            "Ketik /batal untuk mengakhiri sesi.",
+            parse_mode='Markdown'
+        )
+    else:
+        await update.message.reply_text("❌ Fitur pause tidak tersedia untuk role ini.")
+
+
+async def resume_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Handler /resume - Lanjutkan sesi yang di-pause"""
+    user_id = update.effective_user.id
+    settings = get_settings()
+    
+    if user_id != settings.admin_id:
+        await update.message.reply_text("❌ Maaf, command hanya untuk admin.")
+        return
+    
+    mode = await get_user_mode(user_id)
+    active_role = await get_active_role(user_id)
+    
+    if mode != 'role' or not active_role:
+        await update.message.reply_text("📭 Tidak ada sesi yang sedang berjalan.")
+        return
+    
+    flow = _user_flows.get(user_id)
+    if not flow:
+        await update.message.reply_text("📭 Sesi tidak ditemukan.")
+        return
+    
+    if not hasattr(flow, 'is_paused') or not flow.is_paused:
+        await update.message.reply_text("▶️ Tidak ada sesi yang di-pause.")
+        return
+    
+    # Resume session
+    if hasattr(flow, 'resume'):
+        await flow.resume()
+        await update.message.reply_text(
+            "▶️ *Sesi dilanjutkan*\n\n"
+            "Role akan melanjutkan aktivitas.",
+            parse_mode='Markdown'
+        )
+    else:
+        await update.message.reply_text("❌ Fitur resume tidak tersedia untuk role ini.")
+
+
+# =============================================================================
+# REGISTER FUNCTION
+# =============================================================================
+
 def register_role_commands(app):
     """Register semua role commands"""
     app.add_handler(CommandHandler("role", role_command))
+    app.add_handler(CommandHandler("status", status_command))
     app.add_handler(CommandHandler("statusrole", statusrole_command))
     app.add_handler(CommandHandler("batal", batal_command))
-    logger.info("✅ Role commands registered: /role, /statusrole, /batal")
+    app.add_handler(CommandHandler("pause", pause_command))
+    app.add_handler(CommandHandler("resume", resume_command))
+    logger.info("✅ Role commands registered: /role, /status, /statusrole, /batal, /pause, /resume")
