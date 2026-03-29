@@ -33,6 +33,13 @@ def set_nova_available(status: bool):
 
 async def message_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Handler untuk pesan biasa"""
+    if mode == 'role' and active_role:
+        try:
+            from commands.role import get_user_role, get_user_flow  # ← IMPORT DI SINI
+            
+            role = get_user_role(user_id)
+            flow = await get_user_flow(user_id)
+            
     user_id = update.effective_user.id
     settings = get_settings()
     
