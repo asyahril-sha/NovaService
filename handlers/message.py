@@ -141,35 +141,47 @@ async def _stop_auto_send(user_id: int):
     logger.info(f"🛑 Auto-send stopped for user {user_id}")
 
 
-async def _auto_send_loop(user_id: int, flow, context: ContextTypes.DEFAULT_TYPE):
-    """
-    Loop auto-send untuk mengirim scene otomatis
-    Setiap 30 detik cek apakah perlu kirim scene berikutnya
-    """
-    try:
-        while flow.is_active:
-            # Tunggu 30 detik
-            await asyncio.sleep(30)
+    async def _auto_send_loop(self):
+        """Loop background untuk auto-send scene"""
+        while self.auto_send_running and self.is_active and self.auto_send_active:
+            try:
+                if self.waiting_for_response:
+                    await asyncio.sleep(1)
+                    continue
             
-            # Cek apakah perlu kirim scene berikutnya
-            response = await flow.process("")  # Pesan kosong = auto scene
+                if self._is_auto_phase_complete():
+                    logger.info(f"✅ Auto phase {self.current_phase_name} completed")
+                    await self._stop_auto_send_task()
+                    await self._on_auto_phase_complete()
+                    break
             
-            if response:
-                await context.bot.send_message(
-                    chat_id=user_id,
-                    text=response,
-                    parse_mode='Markdown'
-                )
-                logger.info(f"📤 Auto-sent scene for user {user_id}")
+                if self._should_send_next_auto_scene():
+                    scene = await self._generate_current_auto_scene()
+                    if scene:
+                        logger.info(f"📤 Auto-send scene #{self.scene_count} (length: {len(scene)})")
+                    
+                        # ✅ PERBAIKAN: Kirim melalui callback (harus diset dari handler)
+                        if self._send_callback:
+                            try:
+                                await self._send_callback(scene)
+                            l    ogger.info(f"✅ Scene #{self.scene_count} sent")
+                            except Exception as e:
+                                logger.error(f"❌ Send callback failed: {e}")
+                        else:
+                            logger.error("❌ No send callback available!")
+                    
+                        # Simpan ke memory
+                        self.memory.record_action(f"auto_scene_{self.current_phase_name}", scene)
+                        self.memory.update_from_response(scene, self.current_phase_name)
             
-            # Jika flow sudah tidak aktif, stop loop
-            if not flow.is_active:
+                await asyncio.sleep(1)
+            
+            except asyncio.CancelledError:
                 break
-                
-    except asyncio.CancelledError:
-        logger.info(f"Auto-send cancelled for user {user_id}")
-    except Exception as e:
-        logger.error(f"Auto-send error for user {user_id}: {e}", exc_info=True)
+            except Exception as e:
+                logger.error(f"Auto-send loop error: {e}")
+                await asyncio.sleep(5)
+                logger.error(f"Auto-send error for user {user_id}: {e}", exc_info=True)
     finally:
         # Cleanup - HAPUS DENGAN AMAN
         if user_id in _auto_send_tasks:
