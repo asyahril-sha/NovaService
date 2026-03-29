@@ -56,7 +56,7 @@ class PromptBuilder:
 │ 3. KATA VULGAR (SESUAI KARAKTER)                                             │
 ├───────────────────────────────────────────────────────────────────────────────┤
 │ • BOLEH PAKAI: kontol, memek, ngentot, crot, sperma, basah, horny, sange    │
-│ • Karakter dominan (Davina, Jihane, Hana, Alyssa, Laura): LEBIH BEBAS        │
+│ • Karakter dominan (Davina, Jihane, Hana, Sallsa, Laura): LEBIH BEBAS        │
 │ • Karakter lembut (Anya, Maudy, Tara): PAKAI SECUKUPNYA                      │
 │ • JANGAN PAKAI jika tidak sesuai karakter!                                    │
 └───────────────────────────────────────────────────────────────────────────────┘
