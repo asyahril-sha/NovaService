@@ -534,43 +534,43 @@ class PelacurSystem(PelacurAuto, PelacurManual):
         try:
             # Update character dari pesan Mas
             self.character.update_from_message(pesan_mas)
-            
+        
             # Update emotional state
             self._update_emotional_state()
-            
+        
             # Update memory dari pesan Mas
             self.memory.update_from_mas(pesan_mas)
-            
+        
             # ========== SIMPAN KE CONVERSATION HISTORY ==========
             self.conversation_history.append(f"Mas: {pesan_mas[:100]}")
             if len(self.conversation_history) > 50:
                 self.conversation_history.pop(0)
-            
+        
             # Simpan ke conversation context untuk prompt
             self.conversation_context.append(f"Mas: {pesan_mas[:100]}")
             # ====================================================
-            
+        
             # ========== CEK CLIMAX MAS ==========
             mas_climax = await self._check_mas_climax(pesan_mas)
             if mas_climax:
                 self.memory.record_action(pesan_mas, mas_climax)
                 self.scene_context.append(f"Response: {mas_climax[:50]}...")
                 return mas_climax
-            
+        
             # ========== CEK ROLE NATURAL CLIMAX ==========
             role_climax = await self._check_role_natural_climax()
             if role_climax:
                 self.memory.record_action(pesan_mas, role_climax)
                 self.scene_context.append(f"Response: {role_climax[:50]}...")
                 return role_climax
-            
+        
             # ========== CEK WARNING BOOKING ==========
             warning = await self._check_and_send_warning()
             if warning:
                 self.memory.record_action(pesan_mas, warning)
                 self.scene_context.append(f"Warning: {warning[:50]}...")
                 return warning
-            
+        
             # ========== HANDLE WAITING FOR RESPONSE ==========
             if self.waiting_for_response:
                 if pesan_mas and pesan_mas.strip():
@@ -578,7 +578,7 @@ class PelacurSystem(PelacurAuto, PelacurManual):
                     self.scene_context.append(f"Response: {response[:50]}...")
                     return response
                 return None
-            
+        
             # ========== MANUAL MODE AKTIF ==========
             if self.manual_mode_active:
                 response = await self._handle_manual_by_type(pesan_mas)
@@ -586,7 +586,7 @@ class PelacurSystem(PelacurAuto, PelacurManual):
                 self.memory.update_from_response(response, self.manual_mode_type)
                 self.scene_context.append(f"Response: {response[:50]}...")
                 return response
-            
+        
             # ========== AUTO SEND ACTIVE ==========
             if self.auto_send_active:
                 response = await self._process_auto_phase()
@@ -594,16 +594,16 @@ class PelacurSystem(PelacurAuto, PelacurManual):
                     logger.info(f"📤 Auto-send response length: {len(response)} chars")
                     self.scene_context.append(f"Auto scene: {response[:100]}...")
                 return response
-            
+        
             # ========== AFTERCARE ACTIVE ==========
             if self.aftercare_active:
                 response = await self._handle_aftercare(pesan_mas)
                 self.scene_context.append(f"Aftercare: {response[:50]}...")
                 return response
-            
+        
             # ========== DEFAULT ==========
             return self._build_end_session()
-            
+        
         except Exception as e:
             logger.error(f"Process error: {e}", exc_info=True)
             return f"❌ Error: {str(e)}"
