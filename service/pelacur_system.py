@@ -532,6 +532,15 @@ class PelacurSystem(PelacurAuto, PelacurManual):
         Proses pesan Mas - MAIN ENTRY POINT
         """
         try:
+            # ========== CEK PENDING AUTO SCENE ==========
+            # Ini harus PERTAMA, sebelum kode lainnya
+            if hasattr(self, '_pending_scene') and self._pending_scene:
+                scene = self._pending_scene
+                self._pending_scene = None
+                logger.info(f"📤 Sending pending auto-scene (length: {len(scene)})")
+                return scene
+            # ===========================================
+            
             # Update character dari pesan Mas
             self.character.update_from_message(pesan_mas)
         
