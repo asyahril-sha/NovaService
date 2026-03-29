@@ -548,7 +548,6 @@ class PelacurSystem(PelacurAuto, PelacurManual):
         
             # Simpan ke conversation context untuk prompt
             self.conversation_context.append(f"Mas: {pesan_mas[:100]}")
-            # ====================================================
         
             # ========== CEK CLIMAX MAS ==========
             mas_climax = await self._check_mas_climax(pesan_mas)
