@@ -89,12 +89,7 @@ class PelacurAuto(PelacurCore):
                     if scene:
                         logger.info(f"📤 Auto-send scene #{self.scene_count}")
                     
-                        # ✅ KIRIM VIA CALLBACK ATAU QUEUE
-                        if self._send_callback:
-                            await self._send_callback(scene)
-                        else:
-                            # Simpan ke queue untuk diambil process()
-                            self._pending_scene = scene
+                        self._pending_scene = scene
                     
                         # Simpan ke memory
                         self.memory.record_action(f"auto_scene_{self.current_phase_name}", scene)
