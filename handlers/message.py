@@ -95,7 +95,7 @@ async def message_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         "*Nova tersenyum*\n\n\"Iya, Mas. Nova dengerin kok.\n\nKetik /role therapist atau /role pelacur kalo mau service, Mas.\"",
         parse_mode='Markdown'
     )
-
+    
 
 # =============================================================================
 # AUTO-SEND TASK MANAGEMENT
