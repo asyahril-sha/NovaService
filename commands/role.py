@@ -304,7 +304,7 @@ async def pause_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     
     mode = await get_user_mode(user_id)
     active_role = await get_active_role(user_id)
-    flow = await get_user_flow(user_id)
+    flow = get_user_flow(user_id)
     
     if mode != 'role' or not active_role:
         await update.message.reply_text("📭 Tidak ada sesi yang sedang berjalan.")
@@ -347,7 +347,7 @@ async def resume_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     
     mode = await get_user_mode(user_id)
     active_role = await get_active_role(user_id)
-    flow = await get_user_flow(user_id)
+    flow = get_user_flow(user_id)
     
     if mode != 'role' or not active_role:
         await update.message.reply_text("📭 Tidak ada sesi yang sedang berjalan.")
@@ -387,7 +387,7 @@ async def cmd_status(update: Update, context: ContextTypes.DEFAULT_TYPE):
     
     mode = await get_user_mode(user_id)
     active_role = await get_active_role(user_id)
-    flow = await get_user_flow(user_id)
+    flow = get_user_flow(user_id)
     
     if mode != 'role' or not active_role or not flow:
         await update.message.reply_text(
