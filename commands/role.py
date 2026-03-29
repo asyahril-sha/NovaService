@@ -20,7 +20,7 @@ logger = logging.getLogger(__name__)
 
 # Daftar karakter
 THERAPIST_CHARACTERS = ["anya", "syifa", "laura", "tara", "pevita", "maudy", "zara", "angela"]
-PELACUR_CHARACTERS = ["davina", "michelle", "jihane", "tissa", "hana", "shindy", "nadya", "alyssa"]
+PELACUR_CHARACTERS = ["davina", "michelle", "jihane", "tissa", "hana", "shindy", "nadya", "sallsa"]
 
 # Dictionary untuk menyimpan role instance dan flow instance
 _user_roles = {}
@@ -55,7 +55,7 @@ async def role_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
             "🎭 *Pilih Role*\n\n"
             "Gunakan: `/role therapist` atau `/role pelacur`\n\n"
             "*Therapist:* Anya, Syifa, Laura, Tara, Pevita, Maudy, Zara, Angela\n"
-            "*Pelacur:* Davina, Michelle, Jihane, Tissa, Hana, Shindy, Nadya, Alyssa",
+            "*Pelacur:* Davina, Michelle, Jihane, Tissa, Hana, Shindy, Nadya, Sallsa",
             parse_mode='Markdown'
         )
         return
@@ -190,9 +190,9 @@ async def _activate_pelacur(user_id: int, character_key: str, update: Update):
         elif character_key == "nadya":
             from characters.pelacur.nadya import NadyaCharacter
             character = NadyaCharacter()
-        elif character_key == "alyssa":
-            from characters.pelacur.alyssa import AlyssaCharacter
-            character = AlyssaCharacter()
+        elif character_key == "Sallsa":
+            from characters.pelacur.sallsa import SallsaCharacter
+            character = SallsaCharacter()
         else:
             await update.message.reply_text("Karakter tidak ditemukan.")
             return
