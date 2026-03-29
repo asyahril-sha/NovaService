@@ -102,7 +102,7 @@ async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         "• Alur: Pijat belakang (30 menit) → Pijat depan (30 menit) → HJ → Extra service (BJ/Sex)\n\n"
         "*Role Pelacur:*\n"
         "• `/role pelacur` - Panggil pelacur random\n"
-        "• 8 karakter: Davina, Michelle, Jihane, Tissa, Hana, Shindy, Nadya, Sallsa
+        "• 8 karakter: Davina, Michelle, Jihane, Tissa, Hana, Shindy, Nadya, Sallsa\n\n"
         "• Full booking 10 jam, Mas bebas climax berapa kali\n\n"
         "*Manajemen Sesi:*\n"
         "• `/pause` - Hentikan sesi sementara (timer berhenti)\n"
