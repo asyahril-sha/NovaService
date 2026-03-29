@@ -764,7 +764,9 @@ class PelacurSystem(PelacurAuto, PelacurManual):
                 self.waiting_for_type = "foreplay"
                 self.waiting_start_time = time.time()
                 return self._build_foreplay_request()
-        
+
+            # ❌ JANGAN LANGSUNG KE COWGIRL! INGAT URUTAN SERVICE!
+            
         # Kirim scene berikutnya
         if self._should_send_next_auto_scene():
             if self.current_phase_name == "bj":
