@@ -13,34 +13,52 @@ from memory.persistent import get_nova_persistent
 
 logger = logging.getLogger(__name__)
 
+# Dictionary untuk menyimpan mode user
+_user_modes = {}
+_active_roles = {}
+_user_flows = {}
+
+
+async def set_user_mode(user_id: int, mode: str, role: Optional[str] = None):
+    """Set user mode (chat/role)"""
+    _user_modes[user_id] = mode
+    if role:
+        _active_roles[user_id] = role
+    logger.info(f"👤 User {user_id} mode saved: {mode}, role: {role}")
+
 
 async def get_user_mode(user_id: int) -> str:
-    """Ambil mode user dari database"""
-    persistent = await get_nova_persistent()
-    data = await persistent.get_state(f'user_mode_{user_id}')
-    if data:
-        state = json.loads(data)
-        return state.get('mode', 'chat')
-    return 'chat'
+    """Get user mode (default: chat)"""
+    return _user_modes.get(user_id, 'chat')
 
 
-async def set_user_mode(user_id: int, mode: str, active_role: Optional[str] = None):
-    """Simpan mode user ke database"""
-    persistent = await get_nova_persistent()
-    state = {
-        'mode': mode,
-        'active_role': active_role,
-        'updated_at': time.time()
-    }
-    await persistent.set_state(f'user_mode_{user_id}', json.dumps(state))
-    logger.info(f"👤 User {user_id} mode saved: {mode}, role: {active_role}")
+async def set_active_role(user_id: int, role: str):
+    """Set active role for user (therapist/pelacur)"""
+    global _active_roles
+    _active_roles[user_id] = role
+    logger.info(f"👤 User {user_id} active role set to: {role}")
 
 
-async def get_active_role(user_id: int) -> Optional[str]:
-    """Ambil active role dari database"""
-    persistent = await get_nova_persistent()
-    data = await persistent.get_state(f'user_mode_{user_id}')
-    if data:
-        state = json.loads(data)
-        return state.get('active_role')
-    return None
+async def get_active_role(user_id: int) -> str:
+    """Get active role for user"""
+    return _active_roles.get(user_id)
+
+
+async def set_user_flow(user_id: int, flow):
+    """Set flow instance for user"""
+    global _user_flows
+    _user_flows[user_id] = flow
+    logger.info(f"👤 User {user_id} flow set")
+
+
+async def get_user_flow(user_id: int):
+    """Get flow instance for user"""
+    return _user_flows.get(user_id)
+
+
+async def clear_user_flow(user_id: int):
+    """Clear flow instance for user"""
+    global _user_flows
+    if user_id in _user_flows:
+        del _user_flows[user_id]
+        logger.info(f"👤 User {user_id} flow cleared")
