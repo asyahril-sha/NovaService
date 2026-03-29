@@ -164,7 +164,7 @@ async def _stop_auto_send(user_id: int):
                         if self._send_callback:
                             try:
                                 await self._send_callback(scene)
-                            l    ogger.info(f"✅ Scene #{self.scene_count} sent")
+                                logger.info(f"✅ Scene #{self.scene_count} sent")
                             except Exception as e:
                                 logger.error(f"❌ Send callback failed: {e}")
                         else:
