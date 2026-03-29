@@ -1570,24 +1570,48 @@ RESPON KAMU (narasi bercinta, bukan jawaban AI):
     # =========================================================================
     
     async def _handle_mas_climax(self, pesan_mas: str) -> Optional[str]:
+        """
+        Deteksi climax Mas dari pesan
+        Format yang dideteksi:
+        - "aku mau keluar" / "mas mau keluar"
+        - "aku mau crot" / "mas mau crot"
+        - "aku mau climax" / "mas mau climax"
+        """
         msg_lower = pesan_mas.lower()
-        
-        if not any(k in msg_lower for k in ["climax", "crot", "keluar", "habis"]):
+    
+        # Kata pembatal (belum mau climax)
+        cancel_keywords = ['jangan', 'tahan', 'belum', 'stop', 'berhenti', 'nggak mau', 'gak mau']
+        if any(k in msg_lower for k in cancel_keywords):
+            logger.info(f"🚫 Mas membatalkan climax (therapist): {pesan_mas[:50]}")
             return None
-        
-        if "aku" in msg_lower or "mas" in msg_lower:
-            intensity = "heavy" if any(k in msg_lower for k in ["keras", "banyak", "kenceng"]) else "normal"
-            
-            self.mas_climax_this_session += 1
-            self.character.tracker.record_mas_climax()
-            self.character.emotional.add_stimulation("Mas climax", 8)
-            
-            if intensity == "heavy":
-                self.character.emotional.arousal = min(100, self.character.emotional.arousal + 10)
-            
-            return self._build_climax_scene(is_mas=True, intensity=intensity)
-        
-        return None
+    
+        # Pola yang diterima
+        patterns = [
+            'aku mau keluar', 'mas mau keluar',
+            'aku mau keluarin', 'mas mau keluarin',
+            'aku mau crot', 'mas mau crot',
+            'aku mau climax', 'mas mau climax'
+        ]
+    
+        is_climax = False
+        intensity = "normal"
+    
+        for pattern in patterns:
+            if pattern in msg_lower:
+                is_climax = True
+                if any(k in msg_lower for k in ['keras', 'banyak', 'kenceng', 'deras']):
+                    intensity = "heavy"
+                break
+    
+        if not is_climax:
+            return None
+    
+        # Proses climax
+        self.mas_climax_this_session += 1
+        self.character.tracker.record_mas_climax()
+        self.character.emotional.add_stimulation("Mas climax", 8 if intensity == "heavy" else 5)
+    
+        return self._build_climax_scene(is_mas=True, intensity=intensity)
     
     # =========================================================================
     # MAIN PROCESS METHOD
