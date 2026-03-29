@@ -72,34 +72,57 @@ class PelacurAuto(PelacurCore):
     
     async def _auto_send_loop(self):
         """Loop background untuk auto-send scene"""
-        # ✅ PERBAIKAN: ganti not self.auto_send_active menjadi self.auto_send_active
         while self.auto_send_running and self.is_active and self.auto_send_active:
             try:
-                # Cek jika sedang menunggu respons, jangan kirim scene
                 if self.waiting_for_response:
                     await asyncio.sleep(1)
                     continue
             
-                # Cek apakah fase auto sudah selesai
                 if self._is_auto_phase_complete():
                     logger.info(f"✅ Auto phase {self.current_phase_name} completed")
                     await self._stop_auto_send_task()
                     await self._on_auto_phase_complete()
                     break
             
-                # Cek apakah perlu kirim scene berikutnya
                 if self._should_send_next_auto_scene():
                     scene = await self._generate_current_auto_scene()
                     if scene:
-                        logger.info(f"📤 Auto-send scene #{self.scene_count}")
-                        # Kirim scene melalui character
-                        if hasattr(self.character, 'send_message'):
-                            await self.character.send_message(scene)
+                        logger.info(f"📤 Preparing to send scene #{self.scene_count}")
+                        logger.info(f"   Scene length: {len(scene)} characters")
+                        logger.info(f"   Scene preview: {scene[:200]}...")
+                    
+                        # ✅ CEK PANJANG PESAN
+                        max_length = 3000  # Telegram max 4096, kasih buffer
+                        if len(scene) > max_length:
+                            logger.warning(f"⚠️ Scene too long ({len(scene)} chars), truncating")
+                        scene = scene[:max_length]
+                    
+                        # ✅ KIRIM DENGAN ERROR HANDLING DETAIL
+                        try:
+                            # Coba kirim dengan parse_mode None (plain text)
+                            if hasattr(self.character, 'send_message'):
+                                logger.info(f"📤 Sending to Telegram...")
+                                await self.character.send_message(scene, parse_mode=None)
+                                logger.info(f"✅ Scene #{self.scene_count} sent successfully")
+                            else:
+                                logger.error("❌ No send_message method available")
+                        except Exception as send_error:
+                            logger.error(f"❌ Send failed: {send_error}")
+                            logger.error(f"   Error type: {type(send_error).__name__}")
+                        
+                            # Coba kirim versi yang lebih pendek
+                            try:
+                                short_scene = scene[:2000]
+                                await self.character.send_message(short_scene, parse_mode=None)
+                                logger.info(f"✅ Short version sent (2000 chars)")
+                            except Exception as retry_error:
+                                logger.error(f"❌ Retry also failed: {retry_error}")
+                    
                         # Simpan ke memory
                         self.memory.record_action(f"auto_scene_{self.current_phase_name}", scene)
                         self.memory.update_from_response(scene, self.current_phase_name)
             
-                await asyncio.sleep(1)  # Check setiap detik
+                await asyncio.sleep(1)
             
             except asyncio.CancelledError:
                 break
