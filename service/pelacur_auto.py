@@ -87,11 +87,14 @@ class PelacurAuto(PelacurCore):
                 if self._should_send_next_auto_scene():
                     scene = await self._generate_current_auto_scene()
                     if scene:
-                        logger.info(f"📤 Preparing to send scene #{self.scene_count}")
-                        logger.info(f"   Scene length: {len(scene)} characters")
-                        logger.info(f"   Scene preview: {scene[:200]}...")
-                        
-                        self._pending_scene = scene
+                        logger.info(f"📤 Auto-send scene #{self.scene_count}")
+                    
+                        # ✅ KIRIM VIA CALLBACK ATAU QUEUE
+                        if self._send_callback:
+                            await self._send_callback(scene)
+                        else:
+                            # Simpan ke queue untuk diambil process()
+                            self._pending_scene = scene
                     
                         # Simpan ke memory
                         self.memory.record_action(f"auto_scene_{self.current_phase_name}", scene)
@@ -104,7 +107,6 @@ class PelacurAuto(PelacurCore):
             except Exception as e:
                 logger.error(f"Auto-send loop error: {e}")
                 await asyncio.sleep(5)                 
-
     
     async def _generate_current_auto_scene(self) -> str:
         """Generate scene untuk auto phase saat ini"""
