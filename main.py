@@ -29,6 +29,7 @@ from config import get_settings
 from commands import register_general_commands, register_role_commands
 from handlers.message import message_handler, set_nova_available
 from commands.role import cmd_status
+from commands.role import get_user_flow_direct
 
 __version__ = "1.0.0"
 
@@ -183,7 +184,7 @@ async def cmd_pause(update: Update, context: ContextTypes.DEFAULT_TYPE):
     from utils.user_mode import get_active_role, get_user_flow
     
     active_role = await get_active_role(user_id)
-    flow = get_user_flow(user_id)
+    flow = get_user_flow_direct(user_id)
     
     if not active_role or not flow:
         await update.message.reply_text("📭 Tidak ada sesi yang sedang berjalan.")
@@ -222,7 +223,7 @@ async def cmd_resume(update: Update, context: ContextTypes.DEFAULT_TYPE):
     from utils.user_mode import get_active_role, get_user_flow
     
     active_role = await get_active_role(user_id)
-    flow = get_user_flow(user_id)
+    flow = get_user_flow_direct(user_id)
     
     if not active_role or not flow:
         await update.message.reply_text("📭 Tidak ada sesi yang sedang berjalan.")
