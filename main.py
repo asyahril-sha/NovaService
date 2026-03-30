@@ -364,7 +364,7 @@ class NovaServiceBot:
             try:
                 if update and update.effective_message:
                     await update.effective_message.reply_text(
-                        "❌ Terjadi error internal. Silakan coba lagi nanti, Mas.".
+                        "❌ Terjadi error internal. Silakan coba lagi nanti, Mas.",
                         parse_mode='Markdown'
                     )
             except Exception:
